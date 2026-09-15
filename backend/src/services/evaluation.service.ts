@@ -13,6 +13,7 @@ import {
   type TurnRow,
 } from './session.service.js';
 import { getAiConfig } from '../config/credentials.js';
+import { recomputeProgress } from './progress.service.js';
 
 /**
  * Evaluation Engine (Stage 7, PRD §33–§38, §63–§64).
@@ -267,6 +268,14 @@ export async function evaluateSession(sessionId: number): Promise<EvaluationResu
   }
 
   await setEvalStatus(sessionId, 'completed');
+
+  // Roll the progress table forward from source rows. Failure here must not lose
+  // the evaluation that was already persisted, so it is reported, not thrown.
+  try {
+    await recomputeProgress(session.sales_id, scenario.module_id);
+  } catch (err) {
+    console.error(`[progress] gagal recompute untuk sales ${session.sales_id} modul ${scenario.module_id}:`, (err as Error).message);
+  }
 
   return {
     overall_score: total,
