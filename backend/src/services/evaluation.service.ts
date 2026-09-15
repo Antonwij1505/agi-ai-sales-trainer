@@ -14,6 +14,7 @@ import {
 } from './session.service.js';
 import { getAiConfig } from '../config/credentials.js';
 import { recomputeProgress } from './progress.service.js';
+import { buildResultPayload, closeAssignmentIfPassed, enqueueResult } from './integration.service.js';
 
 /**
  * Evaluation Engine (Stage 7, PRD §33–§38, §63–§64).
@@ -268,6 +269,21 @@ export async function evaluateSession(sessionId: number): Promise<EvaluationResu
   }
 
   await setEvalStatus(sessionId, 'completed');
+
+  // Queue the outbound result for Sales Analytics.
+  //
+  // This runs AFTER the evaluation is committed, not inside its transaction, so a
+  // crash in between would leave a scored session with no outbox row. That gap is
+  // covered by reconcileOutbox() in the worker, which re-queues any completed
+  // evaluation that has no outbox row — enqueue is idempotent (UNIQUE session_id),
+  // so reconciliation can never duplicate a result.
+  try {
+    const payload = await buildResultPayload(sessionId);
+    if (payload) await enqueueResult(sessionId, payload);
+    await closeAssignmentIfPassed(session.sales_id, scenario.module_id, passed);
+  } catch (err) {
+    console.error(`[integrasi] gagal enqueue hasil sesi ${sessionId}:`, (err as Error).message);
+  }
 
   // Roll the progress table forward from source rows. Failure here must not lose
   // the evaluation that was already persisted, so it is reported, not thrown.

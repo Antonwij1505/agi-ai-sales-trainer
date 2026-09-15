@@ -9,6 +9,7 @@ import { requireAuth } from './middleware/auth.middleware.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { catalogRouter } from './routes/catalog.routes.js';
 import { healthRouter } from './routes/health.routes.js';
+import { integrationRouter } from './routes/integration.routes.js';
 import { progressRouter } from './routes/progress.routes.js';
 import { sessionRouter } from './routes/session.routes.js';
 
@@ -27,6 +28,9 @@ export function createApp(): express.Application {
   app.use('/api/trainer', catalogRouter);
   app.use('/api/trainer', sessionRouter);
   app.use('/api/trainer', progressRouter);
+
+  // Sales Analytics integration: inbound assignment + outbox administration.
+  app.use('/api/trainer', integrationRouter);
 
   // Admin-only. requireAuth MUST run first: requireAdmin reads req.user, so
   // mounting the router alone would reject even a valid admin token.
