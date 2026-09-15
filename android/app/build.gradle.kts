@@ -17,11 +17,23 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Base URL of the trainer backend. Overridden per build type.
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4100/\"")
+        // Base URL of the trainer backend / auth service.
+        //
+        // Defaults to 10.0.2.2, which is how the Android EMULATOR reaches the
+        // host machine. A physical phone needs the host's LAN address instead,
+        // so both are overridable at build time without editing this file:
+        //
+        //   ./gradlew assembleDebug -PapiHost=192.168.88.12
+        //
+        // (see the `apiHost` property below). Keeping it a build property means
+        // the committed default stays emulator-correct and the repo stays clean.
+        val apiHost = (project.findProperty("apiHost") as String?) ?: "10.0.2.2"
+        val apiPort = (project.findProperty("apiPort") as String?) ?: "4100"
+        val authPort = (project.findProperty("authPort") as String?) ?: "4000"
+
+        buildConfigField("String", "API_BASE_URL", "\"http://$apiHost:$apiPort/\"")
         // Auth is served by the Sales Analytics backend (shared JWT contract).
-        // 10.0.2.2 = the host machine as seen from the Android emulator.
-        buildConfigField("String", "AUTH_BASE_URL", "\"http://10.0.2.2:4000/\"")
+        buildConfigField("String", "AUTH_BASE_URL", "\"http://$apiHost:$authPort/\"")
     }
 
     buildTypes {
