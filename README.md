@@ -47,15 +47,26 @@ lewat `adb input`, dengan hasil dibaca dari screenshot + log akses server.
 | Tombol Batal | kembali ke IDLE, tanpa crash |
 | Kontrak data evaluasi | semua field yang dibaca Kotlin ada di respons nyata (skor 44/100, 5 kompetensi) |
 | Kebocoran request | **0** request saat idle |
+| **Layar Hasil** | ✅ ter-render lewat instrumented Compose test — 6/6 lolos, screenshot di `docs/screenshots/result_screen.png` |
 
-**Yang belum bisa diuji:** layar Hasil lewat alur app. Emulator dijalankan dengan
-`-no-audio` dan emulator Android tidak punya opsi untuk menyuapkan file audio
-sebagai mikrofon, jadi percakapan tidak bisa diselesaikan dari dalam app. Kontrak
-datanya sudah diverifikasi langsung ke API, tapi render layar Hasil belum.
+**Catatan layar Hasil.** Layar ini hanya muncul setelah percakapan suara selesai,
+dan menyelesaikan percakapan butuh input mikrofon nyata — yang **tidak bisa**
+diberikan ke emulator di host ini: emulator 37.1.11 sudah membuang backend ALSA
+(hanya `pa`/`sdl`/`oss`/`none`), `sdl` tidak mendukung input, dan `pa` gagal init
+meski `PULSE_SERVER` sudah diarahkan ke daemon milik user. Jadi layar dipecah
+menjadi komponen stateless `ResultContent` dan dirender lewat instrumented test
+dengan data nyata dari API. Detail di [`docs/EMULATOR_TESTING.md`](docs/EMULATOR_TESTING.md).
+
+Loopback mikrofon virtual di sisi host **sudah terbukti bekerja** (capture
+-18.8 dB, ditranskrip benar oleh whisper) — yang gagal hanya sisi emulatornya.
 
 ## Batasan yang jujur
 
-1. **Layar Hasil belum pernah ter-render.** Datanya terverifikasi; tampilannya belum.
+1. **Layar Hasil ter-render, tapi lewat test — bukan alur UI.** Komponennya sudah
+   terbukti render dengan data nyata (`ResultScreenTest`, 6/6 lolos), tapi belum
+   pernah dicapai dengan menyelesaikan percakapan suara sungguhan di emulator,
+   karena emulator tidak bisa diberi input mikrofon. Lihat
+   [`docs/EMULATOR_TESTING.md`](docs/EMULATOR_TESTING.md).
 2. **Belum ada test otomatis untuk endpoint HTTP.** 21 test yang ada menguji logika
    deterministik tanpa LLM. Alur endpoint diuji manual + di emulator, bukan suite otomatis.
 3. **Belum ada CI.** Tidak ada GitHub Actions; semua verifikasi dijalankan manual.

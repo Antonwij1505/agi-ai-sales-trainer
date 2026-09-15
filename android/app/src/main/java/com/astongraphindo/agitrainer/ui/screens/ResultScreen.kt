@@ -34,9 +34,10 @@ import com.astongraphindo.agitrainer.data.TrainerApi
 /**
  * Result + feedback screen (PRD §39–§49).
  *
- * Evaluation runs on entry (idempotent server-side, so re-entering is free) and
- * shows the score, the pass/fail against the module's passing score, every
- * competency with its evidence quote, and the recommended next step.
+ * Evaluation runs on entry (idempotent server-side, so re-entering is free).
+ * This entry point owns the data loading; the actual UI is [ResultContent],
+ * which is stateless and therefore renderable in a test without a network or a
+ * completed voice conversation.
  */
 @Composable
 fun ResultScreen(
@@ -59,6 +60,29 @@ fun ResultScreen(
         }
     }
 
+    ResultContent(
+        evaluation = evaluation,
+        loading = loading,
+        error = error,
+        onRetry = onRetry,
+        onBackToDashboard = onBackToDashboard,
+    )
+}
+
+/**
+ * The rendered result view. Pure function of its inputs so a Compose test can
+ * drive it with a fixture evaluation — the screen was previously unreachable in
+ * an emulator because completing a voice conversation requires real microphone
+ * input, which the emulator cannot be given.
+ */
+@Composable
+fun ResultContent(
+    evaluation: Evaluation?,
+    loading: Boolean,
+    error: String?,
+    onRetry: () -> Unit,
+    onBackToDashboard: () -> Unit,
+) {
     if (loading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
