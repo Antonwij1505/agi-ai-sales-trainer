@@ -13,11 +13,13 @@
     "migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
+    "@types/multer": "^2.2.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
+    "multer": "^2.4.0",
     "pg": "^8.13.1",
     "zod": "^3.23.8"
   },

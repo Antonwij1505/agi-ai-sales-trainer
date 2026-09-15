@@ -3,6 +3,19 @@ import pg, { type Pool, type PoolClient } from 'pg';
 import { env } from '../config/env.js';
 
 /**
+ * Postgres `bigint` (int8, OID 20) arrives as a *string* from node-postgres to
+ * avoid precision loss. Our bigints are IDs (user ids, FK references), which are
+ * far below Number.MAX_SAFE_INTEGER, and leaving them as strings silently breaks
+ * numeric comparisons — e.g. `session.sales_id !== req.user.sub` where the JWT
+ * carries a number. Parse them to numbers once, here, so the whole service sees
+ * a consistent type.
+ *
+ * Aggregates that could exceed the safe range are cast to text at the query
+ * (see `count(*)::text` in session.service.ts).
+ */
+pg.types.setTypeParser(20, (value: string) => Number(value));
+
+/**
  * Shared connection pool. Bounded because the trainer has ~20 concurrent sales
  * users; a large max would waste Postgres backend memory.
  */

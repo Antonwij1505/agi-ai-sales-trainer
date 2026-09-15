@@ -29,8 +29,8 @@ const envSchema = z.object({
   //    filter_config credential store — never from the Android client).
   AI_BASE_URL: z.string().default(''),
   AI_API_KEY: z.string().default(''),
-  AI_MODEL: z.string().default('orimax_fast'),
-  AI_MODEL_EVAL: z.string().default('orimax_pro'),
+  AI_MODEL: z.string().default('cbai/deepseek-v4.1-flash'),
+  AI_MODEL_EVAL: z.string().default('cbai/deepseek-v4.1-flash'),
 
   // STT — OpenAI-compatible transcription endpoint (Groq whisper).
   STT_BASE_URL: z.string().default(''),
