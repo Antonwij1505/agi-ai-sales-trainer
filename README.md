@@ -15,17 +15,20 @@ PRD: v1.0 · Arsitektur: [`docs/ARCHITECTURE_PROPOSAL.md`](docs/ARCHITECTURE_PRO
 |---|---|---|
 | 0 | Dokumen arsitektur | ✅ disetujui |
 | 1 | Migrasi DB `trainer_*` | ✅ 14 tabel, verified |
-| 2 | Backend skeleton | 🔄 |
-| 3 | Seed kurikulum | ⬜ |
+| 2 | Backend skeleton | ✅ jalan di :4100 |
+| 3 | Seed kurikulum MVP | ✅ MOD-03, 5 skenario |
 | 4 | Prompt manager | ⬜ |
 | 5 | AI Roleplay Engine | ⬜ |
 | 6 | STT + TTS | ⬜ |
 | 7 | Evaluation Engine | ⬜ |
 | 8 | Progress / Retry / History | ⬜ |
-| 9 | Aplikasi Android | ⬜ |
+| 9 | Aplikasi Android | 🟡 skeleton + APK build lolos |
 | 10 | Admin management | ⬜ |
 | 11 | Integrasi Sales Analytics | ⬜ |
 | 12 | Hardening | ⬜ |
+
+**Progress: 4 dari 13 unit (Stage 0–3) ≈ 31%.**
+Android sudah punya build gate yang lolos, tapi UI-nya masih placeholder.
 
 ## Arsitektur singkat
 
@@ -44,36 +47,71 @@ dibaca lewat pola `credentials.ts` yang sama.
 
 ### Prasyarat
 - Node 20+ · Python 3.12 · Docker
-- JDK 17 · Android SDK (cmdline-tools, platform-tools, platforms;android-34, build-tools;34.0.0)
+- JDK 17 · Android SDK 35 · Gradle 8.11.1
 
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
-export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:/opt/gradle/gradle-8.11.1/bin:$PATH"
 ```
 
 ### Database
-Migrasi bersifat idempotent dan hanya menambah tabel berprefiks `trainer_*`
+Migrasi idempotent dan hanya menambah tabel berprefiks `trainer_*`
 (tidak menyentuh tabel Sales Analytics).
 
 ```bash
 docker exec -i orimax-sirup-postgres-1 psql -U orimax -d sirup \
   -v ON_ERROR_STOP=1 < backend/migrations/001_trainer_schema.sql
+docker exec -i orimax-sirup-postgres-1 psql -U orimax -d sirup \
+  -v ON_ERROR_STOP=1 < backend/migrations/002_seed_mvp.sql
 ```
 
 ### Backend
 ```bash
-cd backend && npm install && npm run dev
+cd backend
+cp .env.example .env      # isi JWT_SECRET yang SAMA dengan Sales Analytics
+npm install
+npm run dev               # → http://localhost:4100
+```
+
+Cek:
+```bash
+curl localhost:4100/health          # {"status":"ok",...}
+curl localhost:4100/health/ready    # {"status":"ready","trainer_tables":14}
+```
+
+### Android
+```bash
+cd android
+gradle assembleDebug
+# → app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## Layout
 
 ```
 backend/
-  migrations/   001_trainer_schema.sql   (idempotent, additive)
+  migrations/   001_trainer_schema.sql   (14 tabel, additive + idempotent)
+                002_seed_mvp.sql         (MOD-03 + 5 skenario + rubric)
   src/
+    config/env.ts               validasi env, gagal cepat
+    db/pool.ts                  pg pool + handler koneksi mati
+    db/migrate.ts               runner migrasi idempotent
+    middleware/                 JWT (kontrak sama dgn Sales Analytics) + error
+    routes/                     health, catalog
 android/
+  app/src/main/java/com/astongraphindo/agitrainer/
 docs/           ARCHITECTURE_PROPOSAL.md
 ```
+
+## Endpoint saat ini
+
+| Method | Path | Auth | Keterangan |
+|---|---|---|---|
+| GET | `/health` | — | liveness |
+| GET | `/health/ready` | — | cek schema `trainer_*` ada |
+| GET | `/health/whoami` | JWT | echo identitas |
+| GET | `/api/trainer/modules` | JWT | daftar modul + jumlah skenario |
+| GET | `/api/trainer/modules/:id` | JWT | detail modul + skenario + rubric |
 
 ## Aturan penting
 
@@ -82,4 +120,16 @@ docs/           ARCHITECTURE_PROPOSAL.md
 - **Guardrail evaluasi** — setiap skor kompetensi wajib punya `evidence`. Output LLM
   divalidasi schema; JSON invalid ditolak & di-retry, tidak pernah disimpan.
 - **Fakta produk** — LLM hanya boleh mengambil fakta dari `trainer_product_knowledge`.
+  Jika tidak ada, jawab "tidak tahu" — jangan mengarang.
 - **Idempotency callback** — `trainer_result_outbox` UNIQUE per `session_id`.
+- **Tanpa secret di APK** — diverifikasi dengan strings scan pada APK hasil build.
+
+## Verifikasi yang sudah dijalankan
+
+- Migrasi `001` apply bersih + **re-run tanpa error** (idempotent).
+- Constraint diuji: speaker selain `AI|SALES` ditolak; weight 0 dan >100 ditolak.
+- FK `trainer_*` → `users` existing terbentuk (4 tabel).
+- Seed `002` re-run → tetap 5 skenario (tidak duplikat); Σ weight rubric = 100.
+- Kontrak JWT bersama: token dari secret Sales Analytics diterima backend trainer.
+- APK debug 17 MB build sukses, ter-sign, dan **tidak mengandung API key**
+  maupun host provider (`9router`, `groq`, `deepseek`, `openai`).
