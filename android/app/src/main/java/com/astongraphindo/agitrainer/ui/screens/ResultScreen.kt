@@ -4,15 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -106,49 +106,52 @@ fun ResultContent(
         return
     }
 
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+    // A plain scrolling Column, not a LazyColumn. The result page has a fixed,
+    // small number of items, so lazy virtualisation buys nothing — but it costs
+    // something: a LazyColumn only composes the items currently on screen, so on
+    // a small display (the CI emulator reports androidboot.qemu.skin=320x640) the
+    // lower sections do not exist in the semantics tree at all. Tests then cannot
+    // find or scroll to them, which made the suite resolution-dependent.
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(
-                        if (ev.passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                        RoundedCornerShape(16.dp),
-                    )
-                    .padding(20.dp),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "${ev.overallScore}",
-                        style = MaterialTheme.typography.displayMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Text(
-                        if (ev.passed) "LULUS" else "BELUM LULUS",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Text(
-                        "Nilai lulus: ${ev.passingScore}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    if (ev.passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    RoundedCornerShape(16.dp),
+                )
+                .padding(20.dp),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "${ev.overallScore}",
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Text(
+                    if (ev.passed) "LULUS" else "BELUM LULUS",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Text(
+                    "Nilai lulus: ${ev.passingScore}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
             }
         }
 
-        item {
-            Text("Penilaian per Kompetensi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        }
+        Text("Penilaian per Kompetensi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
-        items(ev.competencies.size) { i ->
-            val c = ev.competencies[i]
+        ev.competencies.forEach { c ->
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                 Column(Modifier.padding(14.dp)) {
                     Row(
@@ -187,36 +190,32 @@ fun ResultContent(
         }
 
         if (ev.strengths.isNotEmpty()) {
-            item { SectionList("Kekuatan", ev.strengths, MaterialTheme.colorScheme.primary) }
+            SectionList("Kekuatan", ev.strengths, MaterialTheme.colorScheme.primary)
         }
         if (ev.weaknesses.isNotEmpty()) {
-            item { SectionList("Perlu diperbaiki", ev.weaknesses, MaterialTheme.colorScheme.tertiary) }
+            SectionList("Perlu diperbaiki", ev.weaknesses, MaterialTheme.colorScheme.tertiary)
         }
         if (ev.criticalErrors.isNotEmpty()) {
-            item { SectionList("Kesalahan kritis", ev.criticalErrors, MaterialTheme.colorScheme.error) }
+            SectionList("Kesalahan kritis", ev.criticalErrors, MaterialTheme.colorScheme.error)
         }
 
         if (ev.recommendation.isNotBlank()) {
-            item {
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text("Rekomendasi Latihan", fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(6.dp))
-                        Text(ev.recommendation, style = MaterialTheme.typography.bodySmall)
-                    }
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("Rekomendasi Latihan", fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    Text(ev.recommendation, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
 
-        item {
-            Spacer(Modifier.height(4.dp))
-            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
-                Text(if (ev.passed) "Latihan Lagi" else "Ulangi Latihan")
-            }
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = onBackToDashboard, modifier = Modifier.fillMaxWidth()) {
-                Text("Kembali ke Daftar Modul")
-            }
+        Spacer(Modifier.height(4.dp))
+        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
+            Text(if (ev.passed) "Latihan Lagi" else "Ulangi Latihan")
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onBackToDashboard, modifier = Modifier.fillMaxWidth()) {
+            Text("Kembali ke Daftar Modul")
         }
     }
 }

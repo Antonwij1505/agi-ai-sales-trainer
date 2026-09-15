@@ -5,18 +5,25 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.test.platform.app.InstrumentationRegistry
 import com.astongraphindo.agitrainer.data.CompetencyScore
 import com.astongraphindo.agitrainer.data.Evaluation
 import com.astongraphindo.agitrainer.ui.screens.ResultContent
 import com.astongraphindo.agitrainer.ui.theme.AGITrainerTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
 /**
  * Captures a PNG of the Result screen so the rendering can be inspected as an
- * artefact rather than only asserted on. Written to the app's external files dir
- * on the device, then pulled with adb.
+ * artefact rather than only asserted on.
+ *
+ * Written to the app's own external files dir, NOT /sdcard/Download: on Android
+ * 14 that path is blocked by scoped storage and the write fails with
+ * "EACCES (Permission denied)". The app-scoped directory is always writable and
+ * is pullable with adb from
+ * /sdcard/Android/data/<package>/files/.
  */
 class ResultScreenshotTest {
 
@@ -82,7 +89,13 @@ class ResultScreenshotTest {
         rule.waitForIdle()
 
         val bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
-        val out = File("/sdcard/Download/result_screen.png")
+        val dir = InstrumentationRegistry.getInstrumentation()
+            .targetContext.getExternalFilesDir(null)
+            ?: error("no external files dir")
+        val out = File(dir, "result_screen.png")
         out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+        assertTrue("screenshot was not written: $out", out.exists() && out.length() > 0)
+        println("SCREENSHOT_PATH=${out.absolutePath}")
     }
 }
