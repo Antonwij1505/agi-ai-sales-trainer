@@ -1,0 +1,17 @@
+# Build artifacts
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.iml
+.idea/
+
+# Local machine SDK path — never shared
+local.properties
+
+# Keystores — the release key must never enter version control
+*.jks
+*.keystore
+!app/debug.keystore
