@@ -1,6 +1,7 @@
 package com.astongraphindo.agitrainer.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
@@ -51,16 +52,28 @@ fun AppNav() {
                 onLogin = { u, p -> vm.login(u, p) },
             )
             // Navigate as soon as a session exists.
-            if (auth.loggedIn) {
-                nav.navigate(Routes.DASHBOARD) { popUpTo(Routes.LOGIN) { inclusive = true } }
+            //
+            // This MUST live in a LaunchedEffect: calling navigate() directly in
+            // the composable body makes it a composition side effect, so every
+            // recomposition fires another navigation. That produced an endless
+            // loop of API calls (observed: hundreds of GET /modules within
+            // seconds) because each navigation re-entered the dashboard, which
+            // reloaded state, which recomposed, which navigated again.
+            LaunchedEffect(auth.loggedIn) {
+                if (auth.loggedIn) {
+                    nav.navigate(Routes.DASHBOARD) { popUpTo(Routes.LOGIN) { inclusive = true } }
+                }
             }
         }
 
         composable(Routes.DASHBOARD) {
             val user = auth.user
-            if (user == null) {
-                nav.navigate(Routes.LOGIN) { popUpTo(Routes.DASHBOARD) { inclusive = true } }
-            } else {
+            LaunchedEffect(user) {
+                if (user == null) {
+                    nav.navigate(Routes.LOGIN) { popUpTo(Routes.DASHBOARD) { inclusive = true } }
+                }
+            }
+            if (user != null) {
                 DashboardScreen(
                     user = user,
                     modules = catalog.modules,
@@ -68,7 +81,9 @@ fun AppNav() {
                     loading = catalog.loading,
                     error = catalog.error,
                     onOpenModule = { id ->
-                        vm.loadModule(id)
+                        // The MODULE screen loads its own data in a LaunchedEffect.
+                        // Loading here too caused a duplicate GET /modules/:id on
+                        // every navigation (observed: 2 identical requests).
                         nav.navigate(Routes.module(id))
                     },
                     onOpenProgress = {
@@ -80,8 +95,8 @@ fun AppNav() {
                         nav.navigate(Routes.LOGIN) { popUpTo(0) }
                     },
                 )
-                // Refresh the catalog (and progress badges) on entry.
-                androidx.compose.runtime.LaunchedEffect(Unit) {
+                // Load once per screen entry, not once per recomposition.
+                LaunchedEffect(Unit) {
                     vm.loadCatalog()
                     vm.loadProgress()
                 }

@@ -29,23 +29,40 @@ PRD: v1.0 · Arsitektur: [`docs/ARCHITECTURE_PROPOSAL.md`](docs/ARCHITECTURE_PRO
 
 **Semua 13 stage (0–12) selesai.**
 
+## Verifikasi di emulator (bukan sekadar kompilasi)
+
+APK dijalankan di emulator Android 14 (x86_64, headless) dan alurnya didorong
+lewat `adb input`, dengan hasil dibaca dari screenshot + log akses server.
+
+| Yang diuji | Hasil |
+|---|---|
+| Install + launch | jalan, tidak crash (`pidof` hidup) |
+| Login form ter-render | ya — judul, Username, Password, Masuk |
+| Login dengan kredensial nyata (`admin` / `admin123`) | **berhasil** → "Halo, Administrator" |
+| Dashboard memuat katalog | ya — kartu MOD-03 dengan "5 skenario · lulus ≥ 80 · maks 3x" |
+| Buka detail modul | ya — 5 skenario + persona + tombol "Mulai Latihan Suara" |
+| Dialog izin mikrofon | muncul, alur permission benar |
+| Mulai sesi suara | ya — `POST /sessions`, opening line dari backend, resistensi 3/5 |
+| Perekaman + VAD | masuk mode "Mendengarkan…", nudge "Customer menunggu…" muncul, tanpa crash |
+| Tombol Batal | kembali ke IDLE, tanpa crash |
+| Kontrak data evaluasi | semua field yang dibaca Kotlin ada di respons nyata (skor 44/100, 5 kompetensi) |
+| Kebocoran request | **0** request saat idle |
+
+**Yang belum bisa diuji:** layar Hasil lewat alur app. Emulator dijalankan dengan
+`-no-audio` dan emulator Android tidak punya opsi untuk menyuapkan file audio
+sebagai mikrofon, jadi percakapan tidak bisa diselesaikan dari dalam app. Kontrak
+datanya sudah diverifikasi langsung ke API, tapi render layar Hasil belum.
+
 ## Batasan yang jujur
 
-Yang **belum** diverifikasi:
-
-1. **UI Android belum pernah dijalankan di perangkat/emulator.** KVM tersedia di
-   host ini (`/dev/kvm` readable+writable, `kvm_intel` loaded, nested=Y), jadi
-   emulator BISA dijalankan — paket `emulator` + system image sedang dipasang.
-   Sampai APK benar-benar dijalankan, perilaku sentuh, perekaman mikrofon nyata,
-   dan playback audio tetap belum teruji. Ini risiko terbuka R1.
-   *Koreksi:* catatan sebelumnya di README ini menyebut KVM tidak ada — itu salah.
-2. **Belum ada test otomatis untuk endpoint HTTP.** 21 test yang ada menguji
-   logika deterministik (aritmatika skor, batas resistensi, sanitasi output,
-   ekstraksi JSON, rendering prompt) tanpa memanggil LLM. Alur endpoint diuji
-   manual dengan data nyata, bukan dengan suite otomatis.
+1. **Layar Hasil belum pernah ter-render.** Datanya terverifikasi; tampilannya belum.
+2. **Belum ada test otomatis untuk endpoint HTTP.** 21 test yang ada menguji logika
+   deterministik tanpa LLM. Alur endpoint diuji manual + di emulator, bukan suite otomatis.
 3. **Belum ada CI.** Tidak ada GitHub Actions; semua verifikasi dijalankan manual.
-4. **Belum ada Docker Compose untuk service trainer.** Dockerfile ada, tapi
-   orkestrasi (postgres + api + worker) belum ditulis.
+4. **Belum ada Docker Compose** untuk service trainer. Dockerfile ada, orkestrasi
+   (postgres + api + worker) belum ditulis.
+5. **Belum diuji di perangkat fisik.** Mikrofon nyata, kebisingan ruangan, dan
+   latensi jaringan seluler belum pernah dicoba.
 
 ## Arsitektur singkat
 

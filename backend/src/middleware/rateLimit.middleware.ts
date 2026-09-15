@@ -1,4 +1,4 @@
-import rateLimit, { type Options } from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator, type Options } from 'express-rate-limit';
 
 /**
  * Rate limits (Stage 12).
@@ -13,8 +13,19 @@ import rateLimit, { type Options } from 'express-rate-limit';
  * IP bucket and starve each other.
  */
 
+/**
+ * Key by user when authenticated, by IP otherwise.
+ *
+ * The IP branch MUST go through `ipKeyGenerator`: a raw `req.ip` string lets an
+ * IPv6 client rotate within its /64 and bypass the limit. express-rate-limit
+ * raises ERR_ERL_KEY_GEN_IPV6 for a hand-rolled version — and because that error
+ * is thrown while the module is being imported, the server still started and
+ * listened, so the misconfiguration was silent. Verified by reading the startup
+ * log rather than assuming the server was healthy.
+ */
 function userOrIp(req: { user?: { sub?: number }; ip?: string }): string {
-  return req.user?.sub !== undefined ? `user:${req.user.sub}` : `ip:${req.ip ?? 'unknown'}`;
+  if (req.user?.sub !== undefined) return `user:${req.user.sub}`;
+  return `ip:${ipKeyGenerator(req.ip ?? '0.0.0.0')}`;
 }
 
 function build(windowMs: number, max: number, message: string): ReturnType<typeof rateLimit> {

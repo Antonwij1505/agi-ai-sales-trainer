@@ -114,6 +114,20 @@ fun LiveSessionScreen(
         if (bubbles.isNotEmpty()) listState.animateScrollToItem(bubbles.lastIndex)
     }
 
+    /**
+     * Abort an in-flight recording.
+     *
+     * recorder.stop() flips its internal `running` flag, which makes the blocking
+     * recordUntilSilence() loop exit and return null — the coroutine then treats
+     * it as "no speech" and returns to IDLE. Without this the user is trapped in
+     * "Mendengarkan…" until the VAD fires or the 60s cap expires.
+     */
+    fun cancelListening() {
+        recorder.stop()
+        phase = Phase.IDLE
+        error = null
+    }
+
     fun listen() {
         if (sessionId == 0) return
         nudge = false
@@ -283,16 +297,24 @@ fun LiveSessionScreen(
                 }
 
                 Phase.LISTENING, Phase.THINKING -> {
-                    Box(
-                        Modifier
-                            .size(84.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 3.dp,
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            Modifier
+                                .size(84.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 3.dp,
+                            )
+                        }
+                        if (phase == Phase.LISTENING) {
+                            // Escape hatch: without this the user is stuck in
+                            // "Mendengarkan…" until VAD decides, with no way out.
+                            Spacer(Modifier.height(10.dp))
+                            Button(onClick = { cancelListening() }) { Text("Batal") }
+                        }
                     }
                 }
 
