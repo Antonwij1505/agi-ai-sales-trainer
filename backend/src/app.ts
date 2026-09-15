@@ -18,7 +18,11 @@ export function createApp(): express.Application {
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cors({ origin: env.corsOrigins }));
-  app.use(express.json({ limit: '2mb' }));
+  // Bounded bodies: the JSON endpoints take short texts and small context blobs.
+  // Audio goes through multer, which enforces its own 15 MB cap. Without a limit
+  // here, one client could buffer gigabytes of JSON into memory.
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '256kb' }));
   app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
   // Public

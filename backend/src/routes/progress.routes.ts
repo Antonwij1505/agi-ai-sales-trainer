@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { HttpError } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { sessionLimiter } from '../middleware/rateLimit.middleware.js';
 import {
   assertCanRetry,
   compareAttempts,
@@ -94,7 +95,7 @@ progressRouter.post('/progress/:moduleId/recompute', requireAuth, async (req, re
  * POST /api/trainer/scenarios/:scenarioId/retry
  * Start a retry attempt, respecting the module's max_attempt.
  */
-progressRouter.post('/scenarios/:scenarioId/retry', requireAuth, async (req, res, next) => {
+progressRouter.post('/scenarios/:scenarioId/retry', requireAuth, sessionLimiter, async (req, res, next) => {
   try {
     const salesId = req.user!.sub;
     const scenarioId = Number(req.params.scenarioId);

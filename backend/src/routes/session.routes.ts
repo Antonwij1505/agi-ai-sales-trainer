@@ -5,6 +5,12 @@ import { z } from 'zod';
 import { HttpError } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import {
+  evaluateLimiter,
+  sessionLimiter,
+  turnLimiter,
+  voiceTurnLimiter,
+} from '../middleware/rateLimit.middleware.js';
+import {
   createSession,
   finishSession,
   getSession,
@@ -34,7 +40,7 @@ const startSchema = z.object({
  * POST /api/trainer/sessions
  * Start a roleplay attempt and return the customer's opening line.
  */
-sessionRouter.post('/sessions', requireAuth, async (req, res, next) => {
+sessionRouter.post('/sessions', requireAuth, sessionLimiter, async (req, res, next) => {
   try {
     const parsed = startSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -89,7 +95,7 @@ const turnSchema = z.object({
  * Body: { text, resistance? }
  * The sales utterance is already text (e.g. typed or transcribed upstream).
  */
-sessionRouter.post('/sessions/:id/turn', requireAuth, async (req, res, next) => {
+sessionRouter.post('/sessions/:id/turn', requireAuth, turnLimiter, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const session = await getSession(id);
@@ -130,6 +136,7 @@ sessionRouter.post('/sessions/:id/turn', requireAuth, async (req, res, next) => 
 sessionRouter.post(
   '/sessions/:id/voice',
   requireAuth,
+  voiceTurnLimiter,
   upload.single('audio'),
   async (req, res, next) => {
     try {
@@ -194,7 +201,7 @@ sessionRouter.post('/sessions/:id/finish', requireAuth, async (req, res, next) =
  * POST /api/trainer/sessions/:id/evaluate — run the rubric evaluation.
  * Idempotent: calling twice returns the stored evaluation (immutable, §67).
  */
-sessionRouter.post('/sessions/:id/evaluate', requireAuth, async (req, res, next) => {
+sessionRouter.post('/sessions/:id/evaluate', requireAuth, evaluateLimiter, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const session = await getSession(id);

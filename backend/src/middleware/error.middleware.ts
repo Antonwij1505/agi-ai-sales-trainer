@@ -31,6 +31,27 @@ export function errorHandler(
     return;
   }
 
+  // Body-parser rejections are CLIENT errors. Reporting them as 500 hides a bad
+  // request as a server fault, which makes debugging and alerting both wrong.
+  const e = err as { type?: string; status?: number; statusCode?: number; message?: string };
+  if (e?.type === 'entity.too.large') {
+    res.status(413).json({ error: 'Payload terlalu besar (maksimal 1 MB).' });
+    return;
+  }
+  if (e?.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'JSON tidak valid pada body permintaan.' });
+    return;
+  }
+  if (e?.type === 'charset.unsupported' || e?.type === 'encoding.unsupported') {
+    res.status(415).json({ error: 'Encoding body tidak didukung.' });
+    return;
+  }
+  // Multer's own size guard.
+  if (e?.message === 'File too large' || (e as { code?: string })?.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: 'File audio terlalu besar (maksimal 15 MB).' });
+    return;
+  }
+
   const message = err instanceof Error ? err.message : String(err);
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error', detail: message });

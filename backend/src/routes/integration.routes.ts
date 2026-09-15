@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { HttpError } from '../middleware/error.middleware.js';
 import { requireAdmin, requireAuth, requireSystemOrAdmin } from '../middleware/auth.middleware.js';
+import { systemLimiter } from '../middleware/rateLimit.middleware.js';
 import {
   assignmentInput,
   buildResultPayload,
@@ -29,6 +30,7 @@ export const integrationRouter = Router();
  */
 integrationRouter.post(
   '/integrations/assignments',
+  systemLimiter,
   requireSystemOrAdmin,
   async (req, res, next) => {
     try {
