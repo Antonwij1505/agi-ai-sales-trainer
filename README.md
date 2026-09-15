@@ -33,10 +33,12 @@ PRD: v1.0 · Arsitektur: [`docs/ARCHITECTURE_PROPOSAL.md`](docs/ARCHITECTURE_PRO
 
 Yang **belum** diverifikasi:
 
-1. **UI Android belum pernah dijalankan di perangkat/emulator.** Host ini tidak
-   punya KVM, jadi emulator tidak bisa dipakai. Kompilasi APK dan kontrak API
-   sudah diverifikasi, tapi perilaku sentuh, perekaman mikrofon nyata, dan
-   playback audio belum pernah diuji di Android. Ini risiko terbuka R1.
+1. **UI Android belum pernah dijalankan di perangkat/emulator.** KVM tersedia di
+   host ini (`/dev/kvm` readable+writable, `kvm_intel` loaded, nested=Y), jadi
+   emulator BISA dijalankan — paket `emulator` + system image sedang dipasang.
+   Sampai APK benar-benar dijalankan, perilaku sentuh, perekaman mikrofon nyata,
+   dan playback audio tetap belum teruji. Ini risiko terbuka R1.
+   *Koreksi:* catatan sebelumnya di README ini menyebut KVM tidak ada — itu salah.
 2. **Belum ada test otomatis untuk endpoint HTTP.** 21 test yang ada menguji
    logika deterministik (aritmatika skor, batas resistensi, sanitasi output,
    ekstraksi JSON, rendering prompt) tanpa memanggil LLM. Alur endpoint diuji
