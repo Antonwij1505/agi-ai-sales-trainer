@@ -168,6 +168,24 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Free disk space for the emulator
+        # The runner ran out of room creating the emulator's userdata partition:
+        #   FATAL | Not enough space to create userdata partition.
+        #           Available: 6828.10 MB ... need 7372.80 MB.
+        # The ubuntu image ships large toolchains this project never uses. Remove
+        # them explicitly rather than via a third-party action, so exactly what
+        # disappears is auditable. The Android SDK is deliberately NOT touched.
+        run: |
+          echo "--- before ---"; df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/lib/android/sdk/system-images/android-33 || true
+          echo "--- after ---"; df -h / | tail -1
+
       - name: Verify the APK carries no provider secret (PRD §78)
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
