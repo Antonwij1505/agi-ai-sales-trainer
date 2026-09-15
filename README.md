@@ -72,8 +72,10 @@ Loopback mikrofon virtual di sisi host **sudah terbukti bekerja** (capture
 2. **Belum ada test otomatis untuk endpoint HTTP.** 21 test yang ada menguji logika
    deterministik tanpa LLM. CI menguji beberapa endpoint lewat stack Compose
    (health, whoami, buat sesi), tapi belum ada suite HTTP yang menyeluruh.
-3. **Belum diuji di perangkat fisik.** Mikrofon nyata, kebisingan ruangan, dan
-   latensi jaringan seluler belum pernah dicoba. Ini gap terbesar yang tersisa.
+3. **Uji perangkat fisik sudah mulai, tapi belum tuntas.** Mikrofon HP terbukti
+   merekam dan audio sampai ke server (uji HP pertama menemukan bug STT Deepgram
+   yang sudah diperbaiki). Yang belum: percakapan suara penuh sampai layar Hasil
+   di HP, kualitas rekaman di ruangan bising, dan latensi jaringan seluler.
 
 ## Arsitektur singkat
 
