@@ -33,6 +33,7 @@ export interface TtsOptions {
 }
 
 const DEFAULT_VOICE = env.TTS_VOICE;
+const DEFAULT_RATE = env.TTS_RATE;
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 /**
@@ -54,7 +55,13 @@ export async function synthesizeSpeech(
   const outPath = join(dir, 'out.mp3');
 
   try {
-    await runEdgeTts(trimmed, voice, outPath, options.rate, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    await runEdgeTts(
+      trimmed,
+      voice,
+      outPath,
+      options.rate ?? DEFAULT_RATE,
+      options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    );
     const buffer = await readFile(outPath);
     if (buffer.length === 0) throw new Error('TTS menghasilkan file kosong.');
     return {

@@ -15,6 +15,8 @@ import {
   isConversationDone,
   nextResistance,
   sanitizeCustomerReply,
+  capSentences,
+  capSpokenLength,
 } from '../services/roleplay.service.js';
 import { extractJsonObject } from '../services/llm.service.js';
 import { render } from '../services/prompt.service.js';
@@ -124,6 +126,57 @@ test('removes a leading role label and wrapping quotes', () => {
 
 test('strips inline markdown emphasis', () => {
   assert.equal(sanitizeCustomerReply('Ini **penting** ya'), 'Ini penting ya');
+});
+
+test('caps a lecturing reply to a spoken length', () => {
+  // The model drifted into multi-sentence policy explanations. A front-office
+  // clerk on the phone does not deliver a paragraph.
+  const raw =
+    'Mohon maaf, Pak Adi. Untuk informasi nama pejabat, saya tidak bisa memberikan. ' +
+    'Kebijakan kami, permintaan seperti itu harus disampaikan secara resmi. ' +
+    'Silakan kirimkan surat resmi ke alamat dinas. Nanti akan diteruskan ke unit yang tepat.';
+  const out = sanitizeCustomerReply(raw);
+  const sentences = out.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
+  assert.ok(
+    sentences.length <= 3,
+    `reply was not capped: ${sentences.length} sentences -> ${out}`,
+  );
+  // It must keep the opening, not truncate from the front.
+  assert.ok(out.startsWith('Mohon maaf'), `cap dropped the opening: ${out}`);
+});
+
+test('leaves a short reply untouched', () => {
+  const short = 'Pagi. Dari mana ya, Pak?';
+  assert.equal(sanitizeCustomerReply(short), short);
+});
+
+test('capSentences never splits mid-clause', () => {
+  assert.equal(capSentences('Satu. Dua. Tiga. Empat.', 2), 'Satu. Dua.');
+  assert.equal(capSentences('Hanya satu kalimat', 2), 'Hanya satu kalimat');
+  assert.equal(capSentences('', 2), '');
+  // A trailing fragment without punctuation is kept when there is room.
+  assert.equal(capSentences('Satu. Dua', 2), 'Satu. Dua');
+});
+
+test('caps by words too, because sentences alone can still be 20s of audio', () => {
+  // Two sentences, but 47 words — a real reply from the model that produced a
+  // 23-second clip. The sentence limit alone let it through.
+  const raw =
+    'Baik, Pak Adi. Untuk pengadaan IT, biasanya ditangani oleh Bagian Umum dan ' +
+    'Kepegawaian, atau bisa juga melalui Pejabat Pengadaan di Subbagian Perencanaan.';
+  const out = capSpokenLength(raw, 2, 30);
+  const words = out.split(/\s+/).filter(Boolean).length;
+  assert.ok(words <= 30, `word cap not enforced: ${words} words -> ${out}`);
+  assert.ok(out.endsWith('.'), `cap did not end on a sentence boundary: ${out}`);
+});
+
+test('always keeps the first sentence even if it alone is too long', () => {
+  const long =
+    'Mohon maaf sebelumnya Pak, saya perlu memastikan dulu terkait keperluan Bapak ' +
+    'menghubungi kami hari ini supaya bisa diarahkan ke unit yang benar.';
+  const out = capSpokenLength(long, 2, 5);
+  assert.ok(out.length > 0, 'a reply must never come back empty');
+  assert.ok(out.startsWith('Mohon maaf'), `dropped the opening: ${out}`);
 });
 
 console.log('\nJSON EXTRACTION (tolerant of fences and prose)');

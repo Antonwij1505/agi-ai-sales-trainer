@@ -39,7 +39,9 @@ const envSchema = z.object({
   STT_LANGUAGE: z.string().default('id'),
 
   // TTS — edge-tts voice (free, no key).
-  TTS_VOICE: z.string().default('id-ID-ArdiNeural'),
+  TTS_VOICE: z.string().default('id-ID-GadisNeural'),
+  // Slight speed-up: default edge-tts pacing sounds stiff/robotic on the phone.
+  TTS_RATE: z.string().default('+8%'),
 });
 
 const parsed = envSchema.safeParse(process.env);

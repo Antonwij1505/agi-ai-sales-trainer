@@ -125,12 +125,44 @@ export function isConversationDone(resistance: number, salesText: string, turnCo
   return resistance <= 2 && turnCount >= 6;
 }
 
-function historyBlock(turns: TurnRow[]): string {
-  if (turns.length === 0) return '(belum ada percakapan)';
-  return turns
-    .slice(-HISTORY_WINDOW)
-    .map((t) => `${t.speaker === 'AI' ? 'CS' : 'SALES'}: ${t.text ?? ''}`)
-    .join('\n');
+/**
+ * Build the conversation as ALTERNATING chat messages.
+ *
+ * This was previously a single flattened text block inside one `user` message,
+ * which meant the model had no way to know that IT had spoken the earlier CS
+ * lines. It read them as a transcript someone else wrote, so it kept
+ * re-introducing itself ("Selamat pagi, Pak Adi..." repeated turn after turn).
+ *
+ * Sending real assistant/user turns fixes that: the model sees its own previous
+ * utterances as its own, and continues the conversation instead of restarting it.
+ *
+ * A synthetic opening user turn is prepended because the conversation starts
+ * with the CS speaking — chat APIs expect the first non-system message to come
+ * from the user. Consecutive same-role messages are merged, since strict
+ * providers reject role repetition.
+ */
+export function buildConversationMessages(
+  systemContent: string,
+  turns: TurnRow[],
+): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: systemContent },
+    { role: 'user', content: '(Telepon tersambung. Sales menelepon masuk.)' },
+  ];
+
+  for (const t of turns.slice(-HISTORY_WINDOW)) {
+    const text = (t.text ?? '').trim();
+    if (!text) continue;
+    const role = t.speaker === 'AI' ? 'assistant' : 'user';
+    const last = messages[messages.length - 1];
+    if (last && last.role === role) {
+      last.content = `${last.content}\n${text}`;
+    } else {
+      messages.push({ role, content: text });
+    }
+  }
+
+  return messages;
 }
 
 /**
@@ -219,24 +251,13 @@ export async function generateReply(input: GenerateReplyInput): Promise<Roleplay
 
   const resistance = Math.max(1, Math.min(5, input.resistance));
 
-  const messages = [
-    {
-      role: 'system' as const,
-      content: buildSystemMessage(scenario, prompts, productKnowledge, resistance),
-    },
-    {
-      role: 'user' as const,
-      content: [
-        '=== PERCAKAPAN SEJAUH INI ===',
-        historyBlock(turns),
-        '',
-        'Balas sebagai CS (1-2 kalimat, bahasa Indonesia lisan, tanpa markdown):',
-      ].join('\n'),
-    },
-  ];
+  const messages = buildConversationMessages(
+    buildSystemMessage(scenario, prompts, productKnowledge, resistance),
+    turns,
+  );
 
   const { content, model, provider } = await chat(messages, {
-    temperature: 0.7,
+    temperature: 0.9,
     maxTokens: 400,
     timeoutMs: 45_000,
   });
@@ -313,5 +334,67 @@ export function sanitizeCustomerReply(raw: string): string {
   // Remove inline markdown emphasis.
   text = text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1');
 
-  return text;
+  // Enforce a spoken-length ceiling.
+  //
+  // The prompt asks for two short sentences, but a prompt is a request — the
+  // model drifted into 4-5 sentence policy explanations (one reply produced 23
+  // seconds of audio). This is the guarantee: a front-office clerk on the phone
+  // does not deliver a paragraph, and long replies also make the audio drag.
+  return capSpokenLength(text, MAX_REPLY_SENTENCES, MAX_REPLY_WORDS);
+}
+
+/** Spoken replies are short; anything longer is the model lecturing. */
+const MAX_REPLY_SENTENCES = 2;
+/** Word ceiling. Sentence count alone is not enough — models write LONG sentences. */
+const MAX_REPLY_WORDS = 30;
+
+/**
+ * Trim to at most `maxSentences` sentences AND at most `maxWords` words.
+ *
+ * Two limits because one is not enough in practice: a 2-sentence reply can still
+ * run 55 words, which is 20+ seconds of synthesized speech. Sentences are added
+ * greedily while both budgets allow, so the result always ends on a sentence
+ * boundary — never mid-clause.
+ */
+export function capSpokenLength(text: string, maxSentences: number, maxWords: number): string {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+
+  const sentences = splitSentences(trimmed);
+  const kept: string[] = [];
+  let words = 0;
+
+  for (const s of sentences) {
+    const w = s.split(/\s+/).filter(Boolean).length;
+    // Always keep the first sentence, even if it alone exceeds the budget —
+    // returning nothing would be worse than returning one long sentence.
+    if (kept.length > 0 && (kept.length >= maxSentences || words + w > maxWords)) break;
+    kept.push(s);
+    words += w;
+  }
+
+  return kept.join(' ').trim();
+}
+
+/** Split on '.', '?', '!' followed by whitespace or end-of-string. */
+function splitSentences(text: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    current += ch;
+    const isTerminator = ch === '.' || ch === '?' || ch === '!';
+    const next = text[i + 1];
+    if (isTerminator && (next === undefined || /\s/.test(next))) {
+      parts.push(current.trim());
+      current = '';
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts.filter(Boolean);
+}
+
+/** Backwards-compatible sentence-only cap (used by tests and callers). */
+export function capSentences(text: string, max: number): string {
+  return capSpokenLength(text, max, Number.MAX_SAFE_INTEGER);
 }
