@@ -56,9 +56,24 @@ until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep
 # run instrumented tests (includes ResultScreenTest + ResultScreenshotTest)
 cd android && gradle connectedDebugAndroidTest
 
-# pull the captured screenshot
-adb pull /sdcard/Download/result_screen.png /tmp/result_screen.png
+# pull the captured screenshot (app-scoped dir — /sdcard/Download is blocked by
+# Android 14 scoped storage and fails with EACCES)
+adb pull /sdcard/Android/data/com.astongraphindo.agitrainer/files/result_screen.png \
+  /tmp/result_screen.png
 ```
+
+## A note on the Result screen test
+
+The screen was previously laid out with a `LazyColumn`. That only composes the
+items currently on screen, so on the CI emulator (which reports
+`androidboot.qemu.skin=320x640`) the lower sections were **not in the semantics
+tree at all** — `performScrollTo()` could not find the back button. The suite
+passed on a 1080x2400 emulator and failed on the runner.
+
+It is now a plain `Column` + `verticalScroll`: the page has a fixed, small number
+of items, so lazy virtualisation bought nothing and only cost correctness. Tests
+use `assertIsDisplayed()` only for content above the fold and `assertExists()` for
+the rest, so they no longer depend on display size.
 
 ## Emulator setup (one time)
 

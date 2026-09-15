@@ -7,6 +7,8 @@ berdasarkan rubric training.
 
 PRD: v1.0 · Arsitektur: [`docs/ARCHITECTURE_PROPOSAL.md`](docs/ARCHITECTURE_PROPOSAL.md)
 
+[![CI](https://github.com/Antonwij1505/agi-ai-sales-trainer/actions/workflows/ci.yml/badge.svg)](https://github.com/Antonwij1505/agi-ai-sales-trainer/actions/workflows/ci.yml)
+
 ---
 
 ## Status
@@ -63,20 +65,15 @@ Loopback mikrofon virtual di sisi host **sudah terbukti bekerja** (capture
 ## Batasan yang jujur
 
 1. **Layar Hasil ter-render, tapi lewat test — bukan alur UI.** Komponennya sudah
-   terbukti render dengan data nyata (`ResultScreenTest`, 6/6 lolos), tapi belum
-   pernah dicapai dengan menyelesaikan percakapan suara sungguhan di emulator,
-   karena emulator tidak bisa diberi input mikrofon. Lihat
-   [`docs/EMULATOR_TESTING.md`](docs/EMULATOR_TESTING.md).
+   terbukti render dengan data nyata (`ResultScreenTest`, 6/6 lolos di emulator
+   lokal *dan* di runner GitHub), tapi belum pernah dicapai dengan menyelesaikan
+   percakapan suara sungguhan, karena emulator tidak bisa diberi input mikrofon.
+   Lihat [`docs/EMULATOR_TESTING.md`](docs/EMULATOR_TESTING.md).
 2. **Belum ada test otomatis untuk endpoint HTTP.** 21 test yang ada menguji logika
-   deterministik tanpa LLM. Alur endpoint diuji manual + di emulator, bukan suite otomatis.
-3. **CI belum pernah dijalankan di GitHub.** Workflow ada di
-   [`.github/workflows/ci.yml`](.github/workflows/ci.yml), dan setiap langkahnya
-   sudah dijalankan manual di host ini dengan perintah yang identik — tapi runner
-   GitHub-nya sendiri belum pernah dipakai. Langkah instrumented test memakai
-   `reactivecircus/android-emulator-runner`, yang **tidak bisa** saya jalankan
-   lokal, jadi langkah itu belum terverifikasi sama sekali.
-4. **Belum diuji di perangkat fisik.** Mikrofon nyata, kebisingan ruangan, dan
-   latensi jaringan seluler belum pernah dicoba.
+   deterministik tanpa LLM. CI menguji beberapa endpoint lewat stack Compose
+   (health, whoami, buat sesi), tapi belum ada suite HTTP yang menyeluruh.
+3. **Belum diuji di perangkat fisik.** Mikrofon nyata, kebisingan ruangan, dan
+   latensi jaringan seluler belum pernah dicoba. Ini gap terbesar yang tersisa.
 
 ## Arsitektur singkat
 
