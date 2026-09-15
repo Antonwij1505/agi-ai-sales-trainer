@@ -13,25 +13,29 @@
 --      repeating greetings, and nothing that pushes toward how people actually
 --      talk on the phone.
 --
--- IMMUTABILITY (PRD §60, §67): v2 rows are NOT edited. New rows are inserted and
--- the old ones deactivated, so evaluations that reference v2 keep resolving to
--- the exact text that produced them.
+-- IDEMPOTENCY IS MANDATORY HERE. server.ts runs every migration on each boot, so
+-- a non-idempotent migration corrupts state on every restart. An earlier version
+-- of this file used `MAX(version) + 1`, which minted a brand-new prompt version
+-- on every restart — system reached v11 and rules v12, all garbage. Two rules
+-- now:
+--   * the version number is a LITERAL, never derived;
+--   * the active flag is set by equality, so re-running converges on the same
+--     state instead of flipping rows.
 --
--- The new version number is computed with a scalar subquery, which always yields
--- exactly one row even when no previous version exists.
+-- IMMUTABILITY (PRD §60, §67): older rows are never edited or deleted — they are
+-- only deactivated, so historical evaluations still resolve to the exact text
+-- that produced them.
 -- =============================================================================
 
 BEGIN;
 
--- ── system ──────────────────────────────────────────────────────────────────
--- v3: lisan natural, tanpa sapaan berulang
-UPDATE trainer_prompts SET active = false WHERE key = 'system' AND active = true;
+-- ── system v3 ───────────────────────────────────────────────────────────────
+-- Exactly version 3 is active for this key; every other version is deactivated.
+-- Re-running is a no-op.
+UPDATE trainer_prompts SET active = (version = 3) WHERE key = 'system';
 
 INSERT INTO trainer_prompts (key, version, content, active)
-VALUES (
-  'system',
-  (SELECT COALESCE(MAX(version), 0) + 1 FROM trainer_prompts WHERE key = 'system'),
-  $prompt$Kamu adalah customer instansi pemerintah Indonesia dalam SIMULASI LATIHAN TELEMARKETING internal ORIMAX. Ini latihan internal, bukan percakapan dengan publik.
+SELECT 'system', 3, $prompt$Kamu adalah customer instansi pemerintah Indonesia dalam SIMULASI LATIHAN TELEMARKETING internal ORIMAX. Ini latihan internal, bukan percakapan dengan publik.
 
 Peranmu: {{persona_name}}, {{persona_role}} di {{institution_type}}. Kamu sibuk, agak curiga pada telemarketing, dan melindungi waktu atasanmu.
 
@@ -48,38 +52,27 @@ ATURAN KERAS:
 2. Jangan pernah menyebut bahwa ini simulasi atau latihan.
 3. Jangan pakai markdown, heading, bullet, tanda bintang, atau tanda kutip pembuka-penutup.
 4. Balas HANYA ucapanmu sebagai CS: 1-3 kalimat bahasa Indonesia lisan.
-5. Jika sales sopan dan jelas, kamu melunak bertahap. Jika sales memaksa atau kasar, kamu makin menolak.$prompt$,
-  true
-);
+5. Jika sales sopan dan jelas, kamu melunak bertahap. Jika sales memaksa atau kasar, kamu makin menolak.$prompt$, true
+WHERE NOT EXISTS (SELECT 1 FROM trainer_prompts WHERE key = 'system' AND version = 3);
 
--- ── rules ───────────────────────────────────────────────────────────────────
--- v3: lisan, tanpa pengulangan
-UPDATE trainer_prompts SET active = false WHERE key = 'rules' AND active = true;
+-- ── rules v3 ────────────────────────────────────────────────────────────────
+UPDATE trainer_prompts SET active = (version = 3) WHERE key = 'rules';
 
 INSERT INTO trainer_prompts (key, version, content, active)
-VALUES (
-  'rules',
-  (SELECT COALESCE(MAX(version), 0) + 1 FROM trainer_prompts WHERE key = 'rules'),
-  $prompt$Aturan balasan:
+SELECT 'rules', 3, $prompt$Aturan balasan:
 - Bahasa Indonesia lisan, seperti orang bicara di telepon. Maksimal 3 kalimat pendek.
 - Jangan menyapa ulang ("selamat pagi", "halo") kalau sudah pernah menyapa.
 - Jangan mengulang kalimatmu sendiri. Tanggapi ucapan sales yang terakhir.
 - Jangan pakai markdown, bullet, atau tanda bintang.
-- Jangan pernah keluar dari peran sebagai CS.$prompt$,
-  true
-);
+- Jangan pernah keluar dari peran sebagai CS.$prompt$, true
+WHERE NOT EXISTS (SELECT 1 FROM trainer_prompts WHERE key = 'rules' AND version = 3);
 
--- ── persona ─────────────────────────────────────────────────────────────────
--- v3: gaya bicara manusia, bukan teks
+-- ── persona v3 ──────────────────────────────────────────────────────────────
 -- The style hint drives the model's register; make it explicitly human.
-UPDATE trainer_prompts SET active = false WHERE key = 'persona' AND active = true;
+UPDATE trainer_prompts SET active = (version = 3) WHERE key = 'persona';
 
 INSERT INTO trainer_prompts (key, version, content, active)
-VALUES (
-  'persona',
-  (SELECT COALESCE(MAX(version), 0) + 1 FROM trainer_prompts WHERE key = 'persona'),
-  $prompt$Persona: {{persona_name}}, {{persona_role}} di {{institution_type}}. Sikap: {{persona_attitude}}. Gaya bicara: {{persona_communication_style}} — orang kantor yang sibuk dan bicara apa adanya, bukan kaku seperti membaca teks. Level resistensi awal: {{resistance_level}} dari 5.$prompt$,
-  true
-);
+SELECT 'persona', 3, $prompt$Persona: {{persona_name}}, {{persona_role}} di {{institution_type}}. Sikap: {{persona_attitude}}. Gaya bicara: {{persona_communication_style}} — orang kantor yang sibuk dan bicara apa adanya, bukan kaku seperti membaca teks. Level resistensi awal: {{resistance_level}} dari 5.$prompt$, true
+WHERE NOT EXISTS (SELECT 1 FROM trainer_prompts WHERE key = 'persona' AND version = 3);
 
 COMMIT;

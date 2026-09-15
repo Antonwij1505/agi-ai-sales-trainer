@@ -1,34 +1,33 @@
 -- =============================================================================
 -- 005_prompts_v4_singkat.sql — prompt v4: short, spoken Indonesian.
 --
--- WHY: after v3 removed the repeated greetings, the replies became long formal
--- paragraphs (4-5 sentences of bureaucratic prose). A real front-office clerk on
--- the phone says two short sentences, not a policy memo. v3 asked for "1-3
--- kalimat" but nothing enforced it and the model drifted long.
+-- WHY: after v3 removed the repeated greetings, replies became long formal
+-- paragraphs (4-5 sentences of bureaucratic prose, one producing 23 SECONDS of
+-- audio). A real front-office clerk on the phone says two short sentences, not a
+-- policy memo. v3 asked for "1-3 kalimat" but nothing enforced it.
 --
 -- Two changes:
---   1. This migration: v4 prompt states the length limit as a hard constraint
---      with a worked example of the target register.
---   2. Code (sanitizeCustomerReply): a deterministic sentence cap, so length is
---      bounded even when the model ignores the instruction. Prompts are a
---      request; the sanitiser is the guarantee.
+--   1. This migration: v4 states the length limit as a hard constraint and gives
+--      worked examples of the target register.
+--   2. Code (capSpokenLength in roleplay.service.ts): a deterministic sentence
+--      AND word cap, so length is bounded even when the model ignores the
+--      instruction. A prompt is a request; the sanitiser is the guarantee.
 --
--- IMMUTABILITY (PRD §60, §67): v3 rows are not edited — new rows are inserted and
--- the old ones deactivated, so historical evaluations still resolve to the exact
--- prompt text that produced them.
+-- IDEMPOTENCY: server.ts runs every migration on each boot. The version is a
+-- literal and `active` is set by equality, so re-running converges instead of
+-- minting new versions. (An earlier draft used MAX(version)+1 and produced 11
+-- spurious prompt versions across restarts.)
+--
+-- IMMUTABILITY (PRD §60, §67): v3 rows are kept, only deactivated.
 -- =============================================================================
 
 BEGIN;
 
--- ── system ──────────────────────────────────────────────────────────────────
--- v4: maksimal 2 kalimat pendek, dengan contoh
-UPDATE trainer_prompts SET active = false WHERE key = 'system' AND active = true;
+-- ── system v4 ───────────────────────────────────────────────────────────────
+UPDATE trainer_prompts SET active = (version = 4) WHERE key = 'system';
 
 INSERT INTO trainer_prompts (key, version, content, active)
-VALUES (
-  'system',
-  (SELECT COALESCE(MAX(version), 0) + 1 FROM trainer_prompts WHERE key = 'system'),
-  $prompt$Kamu adalah customer instansi pemerintah Indonesia dalam SIMULASI LATIHAN TELEMARKETING internal ORIMAX. Ini latihan internal, bukan percakapan dengan publik.
+SELECT 'system', 4, $prompt$Kamu adalah customer instansi pemerintah Indonesia dalam SIMULASI LATIHAN TELEMARKETING internal ORIMAX. Ini latihan internal, bukan percakapan dengan publik.
 
 Peranmu: {{persona_name}}, {{persona_role}} di {{institution_type}}. Kamu sibuk, agak curiga pada telemarketing, dan melindungi waktu atasanmu.
 
@@ -59,26 +58,20 @@ ATURAN KERAS:
 2. Jangan pernah menyebut bahwa ini simulasi atau latihan.
 3. Jangan pakai markdown, heading, bullet, atau tanda bintang.
 4. Balas HANYA ucapanmu sebagai CS.
-5. Sales sopan dan jelas: melunak sedikit. Sales memaksa atau kasar: makin menolak.$prompt$,
-  true
-);
+5. Sales sopan dan jelas: melunak sedikit. Sales memaksa atau kasar: makin menolak.$prompt$, true
+WHERE NOT EXISTS (SELECT 1 FROM trainer_prompts WHERE key = 'system' AND version = 4);
 
--- ── rules ───────────────────────────────────────────────────────────────────
--- v4: batas 2 kalimat, tanpa ceramah
-UPDATE trainer_prompts SET active = false WHERE key = 'rules' AND active = true;
+-- ── rules v4 ────────────────────────────────────────────────────────────────
+UPDATE trainer_prompts SET active = (version = 4) WHERE key = 'rules';
 
 INSERT INTO trainer_prompts (key, version, content, active)
-VALUES (
-  'rules',
-  (SELECT COALESCE(MAX(version), 0) + 1 FROM trainer_prompts WHERE key = 'rules'),
-  $prompt$Aturan balasan (keras):
+SELECT 'rules', 4, $prompt$Aturan balasan (keras):
 - Maksimal 2 kalimat pendek, di bawah 25 kata.
 - Bahasa lisan seperti orang menelepon, bukan bahasa surat resmi.
 - Jangan menyapa ulang. Jangan mengulang kalimat sendiri. Jangan memanggil nama terus-menerus.
 - Jangan menjelaskan prosedur atau kebijakan. Tolak atau jawab saja, singkat.
 - Jangan pakai markdown, bullet, atau tanda bintang.
-- Jangan pernah keluar dari peran sebagai CS.$prompt$,
-  true
-);
+- Jangan pernah keluar dari peran sebagai CS.$prompt$, true
+WHERE NOT EXISTS (SELECT 1 FROM trainer_prompts WHERE key = 'rules' AND version = 4);
 
 COMMIT;
