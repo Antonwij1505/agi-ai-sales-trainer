@@ -17,23 +17,39 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Base URL of the trainer backend / auth service.
+        // Base URLs for the trainer backend and the auth service.
         //
-        // Defaults to 10.0.2.2, which is how the Android EMULATOR reaches the
-        // host machine. A physical phone needs the host's LAN address instead,
-        // so both are overridable at build time without editing this file:
+        // Defaults target the Android EMULATOR (10.0.2.2 = the host machine), so
+        // the committed values stay correct for local runs and CI. Every piece is
+        // overridable at build time, because a physical phone needs different
+        // addresses — and in production the two services live on DIFFERENT
+        // hostnames (trainer.orimax.co.id and sirup-api.orimax.co.id), which is
+        // why they are configured separately rather than derived from one host.
         //
+        //   # emulator (default)
+        //   ./gradlew assembleDebug
+        //
+        //   # physical phone on the office LAN
         //   ./gradlew assembleDebug -PapiHost=192.168.88.12
         //
-        // (see the `apiHost` property below). Keeping it a build property means
-        // the committed default stays emulator-correct and the repo stays clean.
+        //   # production, over the internet via Cloudflare
+        //   ./gradlew assembleDebug -PapiScheme=https \
+        //     -PapiHost=trainer.orimax.co.id -PapiPort= \
+        //     -PauthHost=sirup-api.orimax.co.id -PauthPort=
+        fun url(scheme: String, host: String, port: String) =
+            if (port.isEmpty()) "$scheme://$host/" else "$scheme://$host:$port/"
+
+        val apiScheme = (project.findProperty("apiScheme") as String?) ?: "http"
         val apiHost = (project.findProperty("apiHost") as String?) ?: "10.0.2.2"
         val apiPort = (project.findProperty("apiPort") as String?) ?: "4100"
+
+        val authScheme = (project.findProperty("authScheme") as String?) ?: apiScheme
+        val authHost = (project.findProperty("authHost") as String?) ?: apiHost
         val authPort = (project.findProperty("authPort") as String?) ?: "4000"
 
-        buildConfigField("String", "API_BASE_URL", "\"http://$apiHost:$apiPort/\"")
+        buildConfigField("String", "API_BASE_URL", "\"${url(apiScheme, apiHost, apiPort)}\"")
         // Auth is served by the Sales Analytics backend (shared JWT contract).
-        buildConfigField("String", "AUTH_BASE_URL", "\"http://$apiHost:$authPort/\"")
+        buildConfigField("String", "AUTH_BASE_URL", "\"${url(authScheme, authHost, authPort)}\"")
     }
 
     buildTypes {
