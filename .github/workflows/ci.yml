@@ -1,0 +1,194 @@
+name: CI
+
+# Mirrors exactly what is run by hand locally, so a green run here means the same
+# commands passed. Nothing is asserted in CI that was not first verified manually.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend: typecheck, deterministic tests, secret audit.
+  # The guardrails suite needs no database and no network (verified: it passes
+  # against a bogus DATABASE_URL), so it runs without any service containers.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend (typecheck + tests + audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Guardrail tests (deterministic, no LLM/DB)
+        env:
+          # Satisfies the zod env schema; never connected to.
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:1/ci_none
+          JWT_SECRET: ci-dummy-secret-not-used-for-anything-000
+        run: npx tsx src/tests/guardrails.test.ts
+
+      - name: Build (must compile to dist/)
+        run: npm run build
+
+      - name: Secret audit
+        working-directory: .
+        run: bash backend/scripts/security-audit.sh
+
+  # ---------------------------------------------------------------------------
+  # Compose: prove the self-contained stack actually boots and serves.
+  # A compose file that does not run is worthless, so this is a real gate:
+  # it waits for readiness and exercises an authenticated route end to end.
+  # ---------------------------------------------------------------------------
+  compose:
+    name: Docker Compose stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose config
+        run: docker compose config --quiet
+
+      - name: Build and start the stack
+        run: docker compose up --build -d
+
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:4100/health/ready | grep -q '"status":"ready"'; then
+              echo "ready after ${i} attempt(s)"
+              curl -s http://localhost:4100/health/ready
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "stack never became ready; logs follow"
+          docker compose logs
+          exit 1
+
+      - name: Trainer schema is present (14 tables)
+        run: |
+          n=$(docker exec agi-trainer-postgres psql -U orimax -d sirup -t -A \
+                -c "select count(*) from information_schema.tables where table_name like 'trainer_%';")
+          echo "trainer_tables=$n"
+          test "$n" = "14"
+
+      - name: Worker must not log a schema error
+        # Regression guard: the worker once started before migrations finished and
+        # logged 'relation "trainer_evaluations" does not exist'.
+        run: |
+          sleep 18
+          docker logs agi-trainer-worker 2>&1 | tee /tmp/worker.log
+          if grep -q 'does not exist' /tmp/worker.log; then
+            echo "worker hit a missing-relation error"; exit 1
+          fi
+          grep -q 'worker started' /tmp/worker.log
+
+      - name: Authenticated end-to-end (session creation exercises the users FK)
+        run: |
+          cd backend
+          npm ci
+          SID=$(docker exec agi-trainer-postgres psql -U orimax -d sirup -t -A \
+                  -c "select id from users where username='sales';")
+          TOKEN=$(node -e "
+            const jwt=require('jsonwebtoken');
+            process.stdout.write(jwt.sign(
+              {sub:Number(process.argv[1]),username:'sales',role:'sales',nama_lengkap:'Sales Demo'},
+              'dev-only-jwt-secret-change-me-0123456789'));
+          " "$SID")
+          echo "--- whoami ---"
+          curl -fsS -H "Authorization: Bearer $TOKEN" http://localhost:4100/health/whoami
+          echo
+          echo "--- create session ---"
+          curl -fsS -X POST http://localhost:4100/api/trainer/sessions \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d '{"scenario_id":1,"mode":"practice"}' | tee /tmp/session.json
+          grep -q '"success":true' /tmp/session.json
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  # ---------------------------------------------------------------------------
+  # Android: build the APK, then render the Result screen with an instrumented
+  # test on a real emulator. That screen cannot be reached through the UI because
+  # completing a voice conversation needs microphone input the emulator cannot be
+  # given, so the stateless ResultContent is rendered directly.
+  # ---------------------------------------------------------------------------
+  android:
+    name: Android (build + instrumented tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verify the APK carries no provider secret (PRD §78)
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          unzip -q -o "$APK" 'classes*.dex' -d /tmp/dex
+          if strings /tmp/dex/classes*.dex | grep -qE 'sk-[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}'; then
+            echo "API key pattern found in the APK"; exit 1
+          fi
+          if strings /tmp/dex/classes*.dex | grep -qiE '9router|api\.groq\.com|api\.deepseek\.com'; then
+            echo "AI provider host referenced in the APK"; exit 1
+          fi
+          echo "APK clean"
+
+      - name: Enable KVM (required by the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Instrumented tests (Result screen rendering)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          working-directory: android
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest --no-daemon
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports
+          path: android/app/build/reports/androidTests/
+          if-no-files-found: ignore

@@ -69,10 +69,13 @@ Loopback mikrofon virtual di sisi host **sudah terbukti bekerja** (capture
    [`docs/EMULATOR_TESTING.md`](docs/EMULATOR_TESTING.md).
 2. **Belum ada test otomatis untuk endpoint HTTP.** 21 test yang ada menguji logika
    deterministik tanpa LLM. Alur endpoint diuji manual + di emulator, bukan suite otomatis.
-3. **Belum ada CI.** Tidak ada GitHub Actions; semua verifikasi dijalankan manual.
-4. **Belum ada Docker Compose** untuk service trainer. Dockerfile ada, orkestrasi
-   (postgres + api + worker) belum ditulis.
-5. **Belum diuji di perangkat fisik.** Mikrofon nyata, kebisingan ruangan, dan
+3. **CI belum pernah dijalankan di GitHub.** Workflow ada di
+   [`.github/workflows/ci.yml`](.github/workflows/ci.yml), dan setiap langkahnya
+   sudah dijalankan manual di host ini dengan perintah yang identik — tapi runner
+   GitHub-nya sendiri belum pernah dipakai. Langkah instrumented test memakai
+   `reactivecircus/android-emulator-runner`, yang **tidak bisa** saya jalankan
+   lokal, jadi langkah itu belum terverifikasi sama sekali.
+4. **Belum diuji di perangkat fisik.** Mikrofon nyata, kebisingan ruangan, dan
    latensi jaringan seluler belum pernah dicoba.
 
 ## Arsitektur singkat
@@ -93,7 +96,36 @@ Android **tidak pernah** menyimpan API key — semua provider diproksikan backen
 
 ## Setup
 
-### Prasyarat
+### Cara tercepat: Docker Compose (stack mandiri)
+
+Satu perintah, tanpa menyentuh Postgres Sales Analytics:
+
+```bash
+docker compose up --build
+curl localhost:4100/health/ready      # → {"status":"ready","trainer_tables":14}
+docker compose down -v                # -v sekaligus hapus data demo
+```
+
+Yang dijalankan: `postgres` (port host **5433**, bukan 5432 — 5432 sudah dipakai
+analytics), `api` (:4100, menjalankan migrasi sebelum listen), dan `worker`
+(outbox poller).
+
+**Kenapa ada `docker/initdb/000_analytics_base.sql`.** Empat tabel trainer punya
+`sales_id BIGINT REFERENCES users(id)`. Di produksi tabel `users` sudah ada karena
+schema dibagi dengan Sales Analytics; stack mandiri tidak punya, sehingga migrasi
+akan gagal dengan `relation "users" does not exist`. File itu membuat **hanya**
+subset yang dibutuhkan trainer (`users` + `filter_config`), plus dua akun demo:
+
+| username | password | role |
+|---|---|---|
+| `admin` | `admin123` | admin |
+| `sales` | `sales123` | sales |
+
+Kredensial itu **hanya untuk database lokal sekali pakai**. Jangan dipakai di produksi.
+
+### Manual (menempel ke Postgres Sales Analytics yang sudah ada)
+
+#### Prasyarat
 - Node 20+ · Python 3.12 · Docker · ffmpeg
 - JDK 17 · Android SDK 35 · Gradle 8.11.1
 - `edge-tts` CLI (TTS gratis, tanpa API key)
@@ -103,7 +135,7 @@ export ANDROID_HOME="$HOME/Android/Sdk"
 export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:/opt/gradle/gradle-8.11.1/bin:$PATH"
 ```
 
-### Database
+#### Database
 Migrasi idempotent dan hanya menambah tabel berprefiks `trainer_*`
 (tidak menyentuh tabel Sales Analytics).
 
@@ -113,7 +145,7 @@ for f in backend/migrations/*.sql; do
 done
 ```
 
-### Backend
+#### Backend
 ```bash
 cd backend
 cp .env.example .env      # isi JWT_SECRET yang SAMA dengan Sales Analytics
@@ -122,12 +154,27 @@ npm run dev               # API   → http://localhost:4100
 npm run worker            # outbox → kirim hasil ke Sales Analytics
 ```
 
-### Android
+#### Android
 ```bash
 cd android
-gradle assembleDebug
+./gradlew assembleDebug
 # → app/build/outputs/apk/debug/app-debug.apk
 ```
+
+## Test
+
+```bash
+# Backend — 21 test deterministik, tanpa LLM & tanpa DB
+cd backend && npx tsx src/tests/guardrails.test.ts
+
+# Android — render layar Hasil di emulator (6 test)
+cd android && ./gradlew connectedDebugAndroidTest
+
+# Audit keamanan (rahasia di git + di APK)
+bash backend/scripts/security-audit.sh
+```
+
+CI (`.github/workflows/ci.yml`) menjalankan ketiganya plus boot stack Compose.
 
 ## Endpoint
 

@@ -1,0 +1,109 @@
+# =============================================================================
+# AGI AI Sales Trainer — self-contained stack (postgres + api + outbox worker).
+#
+# WHAT THIS IS FOR
+#   A one-command local/demo environment: `docker compose up --build`.
+#   It does NOT touch the production Sales Analytics database or its services.
+#
+# WHY IT IS SELF-CONTAINED
+#   In production the trainer shares the Sales Analytics Postgres. A standalone
+#   stack has no `users` table, and the trainer schema has
+#   `sales_id BIGINT REFERENCES users(id)` on four tables — so the migrations
+#   would fail. `docker/initdb/000_analytics_base.sql` recreates the minimal
+#   subset (users + filter_config) that the trainer actually depends on.
+#   See that file's header for the caveat.
+#
+# HOST PORTS
+#   5433 (not 5432 — the real analytics Postgres already owns 5432)
+#   4100 (the trainer API)
+#
+# USAGE
+#   docker compose up --build
+#   curl localhost:4100/health/ready        # -> {"status":"ready","trainer_tables":14}
+#   docker compose down -v                  # -v also drops the demo data
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agi-trainer-postgres
+    environment:
+      POSTGRES_USER: orimax
+      POSTGRES_PASSWORD: orimax_dev_password
+      POSTGRES_DB: sirup
+    # Host 5433 to avoid colliding with the production analytics Postgres on 5432.
+    ports:
+      - "5433:5432"
+    volumes:
+      - trainer_pgdata:/var/lib/postgresql/data
+      # Runs ONCE, only when the data volume is empty. Creates users +
+      # filter_config so the trainer migrations have their FK target.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orimax -d sirup"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  api:
+    build:
+      context: ./backend
+    container_name: agi-trainer-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4100
+      DATABASE_URL: postgresql://orimax:orimax_dev_password@postgres:5432/sirup
+      CORS_ORIGIN: http://localhost:3000
+      # Demo-only secret. Production MUST reuse the Sales Analytics JWT_SECRET so
+      # one login works on both services — override this in your real deploy.
+      JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me-0123456789}
+      TRAINER_API_KEY: ${TRAINER_API_KEY:-}
+      ANALYTICS_CALLBACK_URL: ${ANALYTICS_CALLBACK_URL:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      STT_BASE_URL: ${STT_BASE_URL:-}
+      STT_API_KEY: ${STT_API_KEY:-}
+      TTS_VOICE: ${TTS_VOICE:-id-ID-ArdiNeural}
+    ports:
+      - "4100:4100"
+    # server.ts applies migrations (idempotent) before listening.
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:4100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    container_name: agi-trainer-worker
+    depends_on:
+      # service_healthy, NOT service_started: the worker's first query is
+      # `SELECT ... FROM trainer_evaluations`, and that table only exists after
+      # the API has applied the migrations. Waiting for the API's healthcheck
+      # (which passes only after `listening on`) avoids a first-tick
+      # "relation does not exist" error.
+      api:
+        condition: service_healthy
+    # Same image, different entrypoint: the outbox poller. Separate process so a
+    # slow/down analytics endpoint can never block a sales finishing a session.
+    command: ["node", "dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://orimax:orimax_dev_password@postgres:5432/sirup
+      JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me-0123456789}
+      ANALYTICS_CALLBACK_URL: ${ANALYTICS_CALLBACK_URL:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      STT_BASE_URL: ${STT_BASE_URL:-}
+      STT_API_KEY: ${STT_API_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  trainer_pgdata:
