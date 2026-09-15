@@ -19,6 +19,9 @@ android {
 
         // Base URL of the trainer backend. Overridden per build type.
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4100/\"")
+        // Auth is served by the Sales Analytics backend (shared JWT contract).
+        // 10.0.2.2 = the host machine as seen from the Android emulator.
+        buildConfigField("String", "AUTH_BASE_URL", "\"http://10.0.2.2:4000/\"")
     }
 
     buildTypes {
@@ -73,6 +76,10 @@ dependencies {
     // Navigation + secure token storage (no provider secrets ever live here)
     implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // HTTP + JSON. org.json ships with Android, so no serialization library is
+    // needed — the wire format is small and hand-mapped in data/Models.kt.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
