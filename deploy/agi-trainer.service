@@ -1,0 +1,38 @@
+[Unit]
+Description=AGI AI Sales Trainer API (:4100)
+Documentation=https://github.com/Antonwij1505/agi-ai-sales-trainer
+# The shared Postgres (Sales Analytics) runs in a container, and migrations are
+# applied at startup, so docker must be up first.
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agi
+Group=agi
+WorkingDirectory=/home/agi/agi-ai-sales-trainer/backend
+
+# Secrets come from the gitignored .env; they never live in this unit file.
+EnvironmentFile=/home/agi/agi-ai-sales-trainer/backend/.env
+Environment=NODE_ENV=production
+# Node is installed via nvm (NOT /usr/bin), so use absolute paths throughout and
+# put the node bin dir on PATH. edge-tts (the TTS provider) lives in the venv.
+Environment=PATH=/home/agi/.nvm/versions/node/v22.23.1/bin:/home/agi/.hermes/hermes-agent/venv/bin:/usr/local/bin:/usr/bin:/bin
+
+# Run the COMPILED output, not tsx: a service should not pay the TypeScript
+# transform cost on every start, and `npm run build` is part of deploy.
+# Requires: npm run build  (dist/server.js + dist/db/migrate.js)
+ExecStart=/home/agi/.nvm/versions/node/v22.23.1/bin/node dist/server.js
+
+Restart=always
+RestartSec=5
+# Voice turns do STT+LLM+TTS; give an in-flight request time to finish.
+TimeoutStopSec=60
+KillSignal=SIGTERM
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agi-trainer
+
+[Install]
+WantedBy=multi-user.target
