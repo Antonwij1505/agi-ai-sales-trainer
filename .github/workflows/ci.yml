@@ -147,7 +147,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      # No android-actions/setup-android step: it runs `sdkmanager tools`, and
+      # that package no longer exists — it fails with "Failed to find package
+      # 'tools'" and aborts the job. The ubuntu-latest image already ships the
+      # Android SDK (ANDROID_HOME=/usr/local/lib/android/sdk), so we just assert
+      # it is there and install the one component the build needs.
+      - name: Verify Android SDK is present
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          test -n "$ANDROID_HOME" || { echo "ANDROID_HOME not set"; exit 1; }
+          test -x "$ANDROID_HOME/platform-tools/adb" || ls "$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" 2>/dev/null || true
+          # The app compiles against SDK 35 (androidx.core 1.15 requires it).
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            --install "platforms;android-35" "build-tools;35.0.0" >/dev/null 2>&1 || true
+          ls "$ANDROID_HOME/platforms"
 
       - uses: gradle/actions/setup-gradle@v4
 
