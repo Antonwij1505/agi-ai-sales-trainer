@@ -17,18 +17,34 @@ PRD: v1.0 · Arsitektur: [`docs/ARCHITECTURE_PROPOSAL.md`](docs/ARCHITECTURE_PRO
 | 1 | Migrasi DB `trainer_*` | ✅ 14 tabel, verified |
 | 2 | Backend skeleton | ✅ jalan di :4100 |
 | 3 | Seed kurikulum MVP | ✅ MOD-03, 5 skenario |
-| 4 | Prompt manager | ⬜ |
-| 5 | AI Roleplay Engine | ⬜ |
-| 6 | STT + TTS | ⬜ |
-| 7 | Evaluation Engine | ⬜ |
+| 4 | Prompt manager | ✅ versioned + cache |
+| 5 | AI Roleplay Engine | ✅ 1.6–2.8s/turn, in-character |
+| 6 | STT + TTS | ✅ round-trip audio Indonesia |
+| 7 | Evaluation Engine | ✅ guardrail + skor deterministik |
 | 8 | Progress / Retry / History | ⬜ |
 | 9 | Aplikasi Android | 🟡 skeleton + APK build lolos |
 | 10 | Admin management | ⬜ |
 | 11 | Integrasi Sales Analytics | ⬜ |
 | 12 | Hardening | ⬜ |
 
-**Progress: 4 dari 13 unit (Stage 0–3) ≈ 31%.**
-Android sudah punya build gate yang lolos, tapi UI-nya masih placeholder.
+**Progress: 8 dari 13 unit (Stage 0–7) ≈ 62%.**
+Backend inti sudah berfungsi end-to-end lewat API. UI Android masih placeholder.
+
+## Keputusan desain yang diambil dari pengukuran, bukan preferensi
+
+**Model tidak diminta mengeluarkan JSON.** Prompt v1 meminta envelope
+`{"reply":..., "resistance":...}`. Diuji ke provider yang terpasang: model tidak
+patuh dan keluar dari peran (`cbai/kimi-k2.6` menjawab `## Analisis Opening`,
+`cbai/minimax-m3` menawarkan membuat draft skrip). Karena itu **server** yang
+memegang state percakapan (`roleplay.service.ts`) — deterministik, bisa diuji
+tanpa LLM, dan kebal prompt injection. Prompt v1 tidak diedit; v2 dibuat dan v1
+dinonaktifkan (migrasi `003`).
+
+**Model default diganti.** `orimax_fast` terukur 34–60s dan mengembalikan
+**konten kosong** (reasoning token menghabiskan budget). Trainer butuh 1–3s, jadi
+dipakai `cbai/deepseek-v4.1-flash` (~2s) lewat key `trainer_ai_model` — key
+analytics `ai_model` tidak diubah.
+
 
 ## Arsitektur singkat
 
@@ -112,6 +128,23 @@ docs/           ARCHITECTURE_PROPOSAL.md
 | GET | `/health/whoami` | JWT | echo identitas |
 | GET | `/api/trainer/modules` | JWT | daftar modul + jumlah skenario |
 | GET | `/api/trainer/modules/:id` | JWT | detail modul + skenario + rubric |
+| POST | `/api/trainer/sessions` | JWT | mulai sesi, balas opening line CS |
+| GET | `/api/trainer/sessions/:id` | JWT | sesi + transkrip + evaluasi |
+| POST | `/api/trainer/sessions/:id/turn` | JWT | turn teks → balasan CS |
+| POST | `/api/trainer/sessions/:id/voice` | JWT | **audio in → STT → LLM → TTS → audio out** |
+| POST | `/api/trainer/sessions/:id/finish` | JWT | tutup sesi |
+| POST | `/api/trainer/sessions/:id/evaluate` | JWT | jalankan evaluasi (idempotent) |
+| GET | `/api/trainer/sessions/:id/evaluation` | JWT | baca evaluasi tersimpan |
+
+## Test
+
+```bash
+cd backend && npx tsx src/tests/guardrails.test.ts   # 21 test, tanpa LLM
+```
+
+Menguji aritmatika skor (bobot rubric tidak bisa di-inflate model), batas
+resistensi 1..5, sanitasi output model, ekstraksi JSON, dan rendering prompt.
+
 
 ## Aturan penting
 
