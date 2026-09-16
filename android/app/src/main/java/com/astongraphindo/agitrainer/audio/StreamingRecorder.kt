@@ -91,7 +91,7 @@ class StreamingRecorder(
      */
     fun streamContinuous(onChunk: (ByteArray) -> Unit) {
         val rec = record ?: return
-        val samplesPerChunk = SAMPLE_RATE * CHUNK_MS / 1000
+        val samplesPerChunk = SAMPLE_RATE * 50 / 1000
         val buffer = ShortArray(samplesPerChunk)
         val bytes = ByteArray(samplesPerChunk * 2)
 
