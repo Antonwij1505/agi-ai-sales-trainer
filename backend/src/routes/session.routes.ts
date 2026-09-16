@@ -149,12 +149,14 @@ sessionRouter.post(
       }
       if (!req.file) throw new HttpError(400, "Field 'audio' wajib diisi.");
 
+      const t0 = Date.now();
       const ext = guessExtension(req.file.mimetype, req.file.originalname);
       const stt = await transcribeAudio({
         buffer: req.file.buffer,
         mimeType: req.file.mimetype || 'audio/wav',
         extension: ext,
       });
+      const t1 = Date.now();
 
       const scenario = await loadScenarioContext(session.scenario_id);
       const resistanceRaw = Number((req.body as Record<string, unknown>).resistance);
@@ -166,8 +168,17 @@ sessionRouter.post(
         resistance,
         salesText: stt.text,
       });
+      const t2 = Date.now();
 
       const tts = await synthesizeSpeech(reply.reply);
+      const t3 = Date.now();
+
+      // Per-stage timings: the pipeline is sequential, so a single slow stage
+      // dominates the felt latency. Without this it is guesswork.
+      console.log(
+        `[timing] stt=${t1 - t0}ms llm=${t2 - t1}ms tts=${t3 - t2}ms total=${t3 - t0}ms ` +
+          `audio=${req.file.size}B out=${tts.buffer.length}B`,
+      );
 
       res.json({
         success: true,
