@@ -18,6 +18,7 @@ import com.astongraphindo.agitrainer.ui.screens.LoginScreen
 import com.astongraphindo.agitrainer.ui.screens.ModuleDetailScreen
 import com.astongraphindo.agitrainer.ui.screens.ProgressScreen
 import com.astongraphindo.agitrainer.ui.screens.ResultScreen
+import kotlinx.coroutines.launch
 
 object Routes {
     const val LOGIN = "login"
@@ -123,10 +124,20 @@ fun AppNav() {
             arguments = listOf(navArgument("moduleId") { type = NavType.IntType }),
         ) { entry ->
             val id = entry.arguments?.getInt("moduleId") ?: 0
+            val askScope = androidx.compose.runtime.rememberCoroutineScope()
             ModuleDetailScreen(
                 detail = detail.detail,
                 loading = detail.loading,
                 error = detail.error,
+                onAskTheory = { scenarioId, question, onOk, onErr ->
+                    askScope.launch {
+                        try {
+                            onOk(vm.askTheory(scenarioId, question))
+                        } catch (e: Exception) {
+                            onErr(e.message ?: "Gagal bertanya ke mentor.")
+                        }
+                    }
+                },
                 onStart = { scenarioId ->
                     val name = detail.detail?.scenarios
                         ?.firstOrNull { it.id == scenarioId }?.name ?: "Latihan"

@@ -12,6 +12,7 @@ import { healthRouter } from './routes/health.routes.js';
 import { integrationRouter } from './routes/integration.routes.js';
 import { progressRouter } from './routes/progress.routes.js';
 import { sessionRouter } from './routes/session.routes.js';
+import { theoryRouter } from './routes/theory.routes.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -38,6 +39,7 @@ export function createApp(): express.Application {
   app.use('/api/trainer', catalogRouter);
   app.use('/api/trainer', sessionRouter);
   app.use('/api/trainer', progressRouter);
+  app.use('/api/trainer', theoryRouter);
 
   // Sales Analytics integration: inbound assignment + outbox administration.
   app.use('/api/trainer', integrationRouter);

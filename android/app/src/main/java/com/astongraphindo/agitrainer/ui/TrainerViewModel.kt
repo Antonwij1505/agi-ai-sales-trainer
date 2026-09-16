@@ -85,6 +85,10 @@ class TrainerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    suspend fun askTheory(scenarioId: Int, question: String): String {
+        return api.askTheory(scenarioId, question)
+    }
+
     fun logout() {
         tokenStore.clear()
         _auth.value = AuthState()

@@ -97,6 +97,17 @@ class TrainerApi(private val tokenStore: TokenStore) {
         return (0 until arr.length()).map { TrainingModule.from(arr.getJSONObject(it)) }
     }
 
+    suspend fun askTheory(scenarioId: Int, question: String): String = withContext(Dispatchers.IO) {
+        val payload = JSONObject()
+            .put("scenarioId", scenarioId)
+            .put("question", question)
+            .toString()
+            .toRequestBody(json)
+        val req = authed("/api/trainer/theory/ask").post(payload).build()
+        val o = execute(req)
+        o.optString("answer", "Tidak ada jawaban.")
+    }
+
     suspend fun moduleDetail(id: Int): ModuleDetail {
         val o = execute(authed("/api/trainer/modules/$id").get().build())
         val m = TrainingModule.from(o.getJSONObject("module"))
@@ -108,8 +119,6 @@ class TrainerApi(private val tokenStore: TokenStore) {
             rubric = (0 until rArr.length()).map { RubricCriterion.from(rArr.getJSONObject(it)) },
         )
     }
-
-    // ── Session ─────────────────────────────────────────────────────────────
 
     data class Started(val sessionId: Int, val opening: String, val resistance: Int)
 

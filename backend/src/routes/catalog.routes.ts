@@ -51,6 +51,7 @@ catalogRouter.get('/modules/:id', requireAuth, async (req, res, next) => {
       `SELECT s.id, s.name, s.description, s.difficulty, s.resistance_level,
               s.product_category, s.institution_type, s.objective,
               s.success_criteria, s.failure_criteria, s.rup_context_required,
+              s.theory_briefing, s.passing_tips,
               p.id AS persona_id, p.name AS persona_name, p.type AS persona_type,
               p.role AS persona_role, p.attitude AS persona_attitude,
               p.communication_style AS persona_communication_style,
