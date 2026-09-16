@@ -229,3 +229,29 @@ yang menentukan batas giliran:
   Yang sudah diuji adalah semua tahap SETELAH capture.
 - Kuota harian free tier belum diketahui batasnya.
 - Mode lama (per giliran) tetap dipertahankan sebagai cadangan untuk koneksi lemah.
+
+### Penilaian tetap bekerja dari transkrip Live
+
+Ini yang paling penting untuk dipastikan: transkrip yang dikumpulkan relay harus
+bisa dinilai per-kompetensi seperti sebelumnya. Diuji dengan mengevaluasi sesi Live
+nyata (session 67):
+
+| | Hasil |
+|---|---|
+| HTTP | 200 |
+| Skor | 11 / 100 (lulus ≥ 80) |
+| Kompetensi | 5, dengan bukti kutipan transkrip |
+| Tersimpan | ya, dengan `prompt_version_id` + `ai_model` |
+
+Contoh bukti yang dihasilkan mesin penilai dari transkrip Live:
+
+> gatekeeper_handling (bobot 30, skor 0): "Sales langsung meminta nomor kontak dan
+> tidak mencari jalur alternatif, tidak mendapatkan nama/jabatan PIC lain, tidak
+> menetapkan waktu konkret, dan percakapan berhenti tanpa hasil."
+
+Skornya rendah karena uji ini hanya **satu giliran** — dan itu justru benar: satu
+pertanyaan pembuka belum menunjukkan kemampuan menembus gatekeeper. Yang terbukti
+di sini adalah **jalur evaluasinya berfungsi**, bukan nilai akhirnya.
+
+Catatan: nama field di API adalah `overall_score` (bukan `score`), dan status
+tersimpan di kolom `status`. Kesalahan baca skrip saya sendiri, bukan bug backend.
