@@ -19,3 +19,7 @@ android/.idea/
 
 # Secrets — never commit provider keys
 **/filter_config*.json
+
+# Python bytecode (prototype scripts)
+__pycache__/
+*.pyc
