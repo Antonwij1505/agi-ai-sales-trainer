@@ -267,3 +267,25 @@ tersimpan di kolom `status`. Kesalahan baca skrip saya sendiri, bukan bug backen
 
 Cek kepemilikan memakai perbandingan `Number()` karena PostgreSQL mengembalikan
 `bigint` sebagai string — perbandingan langsung akan selalu gagal.
+
+### Percakapan banyak giliran (satu sesi)
+
+Uji satu giliran tidak cukup — sesi latihan nyata 5–10 giliran. Diuji dengan 5 giliran
+dalam **satu sesi** yang sama (`test_live_multiturn.py`):
+
+| Giliran | TTFA | Balasan CS |
+|---|---|---|
+| 1 | 2561ms | "Oh, Pak Adi. Maaf, bagian pengadaan sedang rapat itu. Ada keperluan apa ya, Pak?" |
+| 2 | 3177ms | "Proposal? Hmm, nanti saja ya, Pak. Soalnya lagi belum ada kebutuhan." |
+| 3 | 2136ms | "Wah, nggak bisa Pak. Itu rahasia instansi. Maaf sekali ya." |
+| 4 | 2334ms | "Nama lengkap beliau saya tidak berwenang memberitahu, Pak." |
+| 5 | 1981ms | "Ya, silakan. Selamat pagi juga." |
+
+- **5/5 giliran berhasil** dalam satu koneksi.
+- TTFA median **2334ms**, terburuk 3177ms. Pipeline lama ~3700ms (pernah 22000ms).
+- Percakapan **nyambung**: giliran 4 merujuk "Pak Agus" dari giliran 3.
+- Karakter konsisten: menolak memberi kontak dengan alasan yang masuk akal
+  ("rahasia instansi"), bukan menolak asal-asalan.
+
+Transkrip tersimpan 11 baris bergantian SALES/AI, urut dan lengkap — inilah yang
+dibaca mesin penilai.
