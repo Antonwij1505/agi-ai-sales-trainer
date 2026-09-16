@@ -333,7 +333,10 @@ fun LiveVoiceScreen(
                 when (phase) {
                     LivePhase.CONNECTING -> "Menyiapkan…"
                     LivePhase.IDLE -> "Tekan BICARA lalu bicara seperti menelepon"
-                    LivePhase.LISTENING -> "Mendengarkan… bicara sekarang"
+                    // Tell the rep about the button here: without it they wait for
+                    // the silence detector, which is deliberately patient (2.5s) so
+                    // that thinking mid-sentence is not treated as "finished".
+                    LivePhase.LISTENING -> "Mendengarkan… tekan \"Selesai bicara\" kalau sudah selesai"
                     LivePhase.WAITING -> "Customer sedang menjawab…"
                     LivePhase.SPEAKING -> "Customer berbicara… (tekan POTONG untuk memotong)"
                     LivePhase.DONE -> "Percakapan selesai"

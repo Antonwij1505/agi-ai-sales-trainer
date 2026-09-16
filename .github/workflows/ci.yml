@@ -168,6 +168,12 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Unit tests (turn-boundary rule)
+        # Plain JVM tests, no device needed, so they run fast and cannot flake.
+        # TurnDetectorTest pins the silence threshold that a field report showed was
+        # cutting the sales rep off mid-sentence.
+        run: ./gradlew testDebugUnitTest --no-daemon
+
       - name: Free disk space for the emulator
         # The runner ran out of room creating the emulator's userdata partition:
         #   FATAL | Not enough space to create userdata partition.

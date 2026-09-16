@@ -33,12 +33,6 @@ class StreamingRecorder(
         private const val TAG = "StreamingRecorder"
         const val SAMPLE_RATE = 16_000
 
-        /** RMS above this counts as speech. */
-        private const val SPEECH_RMS = 900.0
-
-        /** Quiet for this long after speech ends the turn. */
-        private const val SILENCE_HOLD_MS = 1_200L
-
         /** Emit audio in ~100 ms chunks: small enough to feel live. */
         private const val CHUNK_MS = 100
     }
@@ -47,6 +41,9 @@ class StreamingRecorder(
 
     @Volatile private var running = false
     @Volatile private var speechSeen = false
+
+    /** Turn-boundary rule, shared with the unit tests. */
+    private val detector = TurnDetector()
 
     /** True once speech has been detected during this capture. */
     val speechDetected: Boolean get() = speechSeen
@@ -95,9 +92,6 @@ class StreamingRecorder(
         val buffer = ShortArray(samplesPerChunk)
         val bytes = ByteArray(samplesPerChunk * 2)
 
-        var silentMs = 0L
-        var totalMs = 0L
-
         while (running) {
             var filled = 0
             // AudioRecord.read may return fewer samples than asked; loop until the
@@ -126,19 +120,13 @@ class StreamingRecorder(
             onChunk(bytes.copyOf(filled * 2))
 
             val frameMs = (filled * 1000L) / SAMPLE_RATE
-            totalMs += frameMs
 
-            if (rms > SPEECH_RMS) {
-                speechSeen = true
-                silentMs = 0
-            } else {
-                silentMs += frameMs
-                if (speechSeen && silentMs >= SILENCE_HOLD_MS) break
-            }
-
-            // Safety cap so a stuck capture cannot run forever.
-            if (totalMs >= 60_000) break
+            // The turn rule lives in TurnDetector so it is unit-tested; see that
+            // class for why the threshold is what it is.
+            if (detector.onFrame(rms, frameMs)) break
+            speechSeen = detector.speechDetected
         }
+        speechSeen = detector.speechDetected
         return speechSeen
     }
 

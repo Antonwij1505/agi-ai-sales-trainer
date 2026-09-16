@@ -34,8 +34,13 @@ class VoiceRecorder(
         /** RMS above this counts as speech. Tuned for a phone mic at arm's length. */
         private const val START_THRESHOLD = 900.0
 
-        /** Stop after this much continuous silence, once speech has been heard. */
-        private const val SILENCE_HOLD_MS = 1_200L
+        /** Stop after this much continuous silence, once speech has been heard.
+         *
+         * RAISED from 1200ms for the same reason as StreamingRecorder: measured
+         * natural pauses inside one sentence run 0.9-1.1s, so 1.2s cut people off
+         * mid-thought. Both modes must behave the same or the fallback feels broken.
+         */
+        private const val SILENCE_HOLD_MS = 2_500L
 
         /** Fire the nudge callback after this much silence with no speech at all. */
         private const val NUDGE_AFTER_MS = 5_000L
