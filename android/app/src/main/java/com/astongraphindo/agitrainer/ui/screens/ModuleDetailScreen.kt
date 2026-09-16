@@ -1,5 +1,6 @@
 package com.astongraphindo.agitrainer.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,7 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.astongraphindo.agitrainer.data.ModuleDetail
 import com.astongraphindo.agitrainer.data.Scenario
+import com.astongraphindo.agitrainer.ui.theme.GlassBackground
+import com.astongraphindo.agitrainer.ui.theme.GlassCard
+import com.astongraphindo.agitrainer.ui.theme.GlassColors
+import com.astongraphindo.agitrainer.ui.theme.GlassGradients
+import com.astongraphindo.agitrainer.ui.theme.GlassShapes
 
+/** Module detail, in the glass-gradient style. */
 @Composable
 fun ModuleDetailScreen(
     detail: ModuleDetail?,
@@ -35,80 +42,119 @@ fun ModuleDetailScreen(
     onStart: (Int) -> Unit,
     onStartLive: (Int) -> Unit,
 ) {
-    if (loading || detail == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (error != null) {
-                Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp))
-            } else {
-                CircularProgressIndicator()
-            }
-        }
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Column {
-                Text(detail.module.code, style = MaterialTheme.typography.labelSmall)
-                Text(
-                    detail.module.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                detail.module.description?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text(it, style = MaterialTheme.typography.bodyMedium)
+    GlassBackground {
+        if (loading || detail == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (error != null) {
+                    Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(20.dp),
+                    )
+                } else {
+                    CircularProgressIndicator()
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Lulus ≥ ${detail.module.passingScore} · maks ${detail.module.maxAttempt}x percobaan",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
+            return@GlassBackground
         }
 
-        item {
-            Text(
-                "Skenario (${detail.scenarios.size})",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-
-        items(detail.scenarios, key = { it.id }) { s ->
-            ScenarioCard(s, onStart = { onStart(s.id) }, onStartLive = { onStartLive(s.id) })
-        }
-
-        item {
-            Text(
-                "Penilaian (bobot)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        items(detail.rubric) { r ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(r.competency.replace('_', ' '), style = MaterialTheme.typography.bodyMedium)
-                    r.criteria?.let {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                GlassCard(Modifier.fillMaxWidth(), strong = true) {
+                    Column(Modifier.padding(20.dp)) {
+                        Box(
+                            Modifier
+                                .background(GlassGradients.primary, CircleShape)
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                detail.module.code,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GlassColors.OnGradient,
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
                         Text(
-                            it,
+                            detail.module.name,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = GlassColors.TextDark,
+                        )
+                        detail.module.description?.let {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = GlassColors.TextMuted,
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Lulus ≥ ${detail.module.passingScore} · maks ${detail.module.maxAttempt}x percobaan",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = GlassColors.TextMuted,
                         )
                     }
                 }
-                Text("${r.weight}", fontWeight = FontWeight.SemiBold)
+            }
+
+            item {
+                Text(
+                    "Skenario (${detail.scenarios.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GlassColors.TextDark,
+                    modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+                )
+            }
+
+            items(detail.scenarios, key = { it.id }) { s ->
+                ScenarioCard(s, onStart = { onStart(s.id) }, onStartLive = { onStartLive(s.id) })
+            }
+
+            item {
+                Text(
+                    "Penilaian (bobot)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GlassColors.TextDark,
+                    modifier = Modifier.padding(top = 12.dp, start = 4.dp),
+                )
+            }
+            items(detail.rubric) { r ->
+                GlassCard(Modifier.fillMaxWidth(), strong = true, elevation = 8.dp) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                r.competency.replace('_', ' '),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = GlassColors.TextDark,
+                            )
+                            r.criteria?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = GlassColors.TextMuted,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.padding(horizontal = 8.dp))
+                        Text(
+                            "${r.weight}%",
+                            fontWeight = FontWeight.Bold,
+                            color = GlassColors.BlueStart,
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                    }
+                }
             }
         }
     }
@@ -120,15 +166,24 @@ private fun ScenarioCard(
     onStart: () -> Unit,
     onStartLive: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(s.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    GlassCard(Modifier.fillMaxWidth(), strong = true) {
+        Column(Modifier.padding(18.dp)) {
+            Text(
+                s.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = GlassColors.TextDark,
+            )
             s.description?.let {
-                Spacer(Modifier.height(4.dp))
-                Text(it, style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GlassColors.TextMuted,
+                )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 buildString {
                     append("AI: ${s.persona.name ?: "CS"}")
@@ -136,23 +191,39 @@ private fun ScenarioCard(
                     append(" · resistensi ${s.resistanceLevel}/5")
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = GlassColors.TextMuted,
             )
 
             s.objective?.let {
                 Spacer(Modifier.height(6.dp))
-                Text("Tujuan: $it", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    "Tujuan: $it",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = GlassColors.TextMuted,
+                )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             // Speech-to-speech is the primary path: it sounds like a real phone call
             // and replies noticeably faster. The turn-based mode stays available as a
             // fallback because it works on a weaker connection.
-            Button(onClick = onStartLive, modifier = Modifier.fillMaxWidth()) {
-                Text("Latihan Suara Langsung")
+            Button(
+                onClick = onStartLive,
+                shape = GlassShapes.button,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GlassColors.BlueStart,
+                    contentColor = GlassColors.OnGradient,
+                ),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+            ) {
+                Text("Latihan Suara Langsung", style = MaterialTheme.typography.labelLarge)
             }
-            Spacer(Modifier.height(6.dp))
-            OutlinedButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onStart,
+                shape = GlassShapes.button,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) {
                 Text("Mode Lama (per giliran)")
             }
         }
