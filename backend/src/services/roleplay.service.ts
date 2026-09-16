@@ -176,10 +176,10 @@ function buildSystemMessage(
   resistance: number,
 ): string {
   const vars = {
-    persona_name: ctx.persona_name ?? 'Ibu Sari',
+    persona_name: ctx.persona_name ?? 'Pak Garuda',
     persona_role: ctx.persona_role ?? 'Staf Front Office',
-    persona_attitude: ctx.persona_attitude ?? 'defensive',
-    persona_communication_style: ctx.persona_communication_style ?? 'formal_bureaucratic',
+    persona_attitude: ctx.persona_attitude ?? 'sibuk_ramah',
+    persona_communication_style: ctx.persona_communication_style ?? 'santai_profesional',
     institution_type: ctx.institution_type ?? 'instansi pemerintah',
     scenario_description: ctx.scenario_description ?? '',
     resistance_level: resistance,

@@ -24,11 +24,11 @@ IN_RATE = 16000
 
 # A realistic gatekeeper conversation: opening, value, ask, fallback, close.
 TURNS = [
-    "Selamat pagi Bu, saya Adi dari Orimax. Boleh bicara dengan bagian pengadaan IT?",
-    "Kami supplier printer dan laptop untuk instansi, Bu. Bisa saya kirim proposalnya?",
-    "Kalau boleh, saya minta nomor kontak Pak Agus ya Bu untuk follow up.",
-    "Baik Bu, kalau Pak Agus sedang di luar, boleh saya tahu nama beliau dan jam beliau biasanya ada?",
-    "Terima kasih Bu, saya kirim proposal ke email resmi dinas ya. Selamat pagi.",
+    "Selamat pagi Pak, saya Adi dari Orimax. Boleh bicara dengan bagian pengadaan IT?",
+    "Kami supplier printer dan laptop untuk instansi, Pak. Bisa saya kirim proposalnya?",
+    "Kalau boleh, saya minta nomor kontak Pak Agus ya Pak untuk follow up.",
+    "Baik Pak, kalau Pak Agus sedang di luar, boleh saya tahu nama beliau dan jam beliau biasanya ada?",
+    "Terima kasih Pak, saya kirim proposal ke email resmi dinas ya. Selamat pagi.",
 ]
 
 

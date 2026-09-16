@@ -20,11 +20,11 @@ INSERT INTO trainer_personas (
     budget_condition, default_resistance
 )
 SELECT
-    'Ibu Sari — CS Dinas',
+    'Pak Garuda — CS Dinas',
     'government_cs',
     'Staf Front Office / CS',
-    'defensive',
-    'formal_bureaucratic',
+    'sibuk_ramah',
+    'santai_profesional',
     'low',
     'low',
     'low',
@@ -32,7 +32,13 @@ SELECT
     'unknown',
     4
 WHERE NOT EXISTS (
-    SELECT 1 FROM trainer_personas WHERE name = 'Ibu Sari — CS Dinas'
+    -- Guard on the stable business key (type), NOT on the display name.
+    --
+    -- Why: this migration runs on every server start. The display name is changed
+    -- by a later migration (006), so a name-based guard would stop matching after
+    -- that rename and insert a duplicate persona on every single restart. The
+    -- persona type is the stable identity, so it is the correct key here.
+    SELECT 1 FROM trainer_personas WHERE type = 'government_cs'
 );
 
 -- ---------------------------------------------------------------------------
