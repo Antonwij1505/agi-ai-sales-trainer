@@ -41,6 +41,13 @@ class TurnDetector(
     /** True once any frame exceeded [speechRms] during this turn. */
     val speechDetected: Boolean get() = heardSpeech
 
+    /** Reset internal state for a new turn. */
+    fun reset() {
+        silentMs = 0L
+        totalMs = 0L
+        heardSpeech = false
+    }
+
     /**
      * Feed one frame.
      *

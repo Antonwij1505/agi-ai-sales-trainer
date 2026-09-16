@@ -48,7 +48,7 @@ const envSchema = z.object({
   LIVE_MODEL: z.string().default('models/gemini-2.5-flash-native-audio-latest'),
   LIVE_VOICE: z.string().default('Puck'),
   // Keep automatic VAD OFF by default: it truncates turns at mid-sentence pauses.
-  LIVE_DISABLE_AUTO_VAD: z.string().default('true'),
+  LIVE_DISABLE_AUTO_VAD: z.string().default('false'),
   // Hard cap on one Live session, so a forgotten socket cannot burn quota.
   LIVE_MAX_SESSION_MS: z.coerce.number().int().positive().default(900_000),
 });

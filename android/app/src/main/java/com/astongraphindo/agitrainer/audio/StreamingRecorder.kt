@@ -4,27 +4,18 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import kotlin.math.sqrt
 
 /**
- * Microphone capture that STREAMS raw PCM instead of writing a file.
+ * Microphone capture that STREAMS raw PCM continuously for full-duplex hands-free calls.
  *
- * Why a separate class from [VoiceRecorder]: that one buffers a whole utterance into
- * a WAV and is still used by the HTTP fallback path. This one exists for Gemini Live,
- * where audio must reach the server as it is spoken (speech-to-speech), and where the
- * reply starts arriving while the rep is still finishing.
+ * Output format is fixed by Gemini Live API: PCM16, mono, 16 kHz.
  *
- * Output format is fixed by the Live API: PCM16, mono, 16 kHz.
- *
- * TURN DETECTION — the important part.
- * Gemini's own automatic VAD was measured truncating turns at a natural mid-sentence
- * pause (see backend/scripts/diag_vad.py): a 9.7 s utterance was heard as its first
- * ~2 s, and the second request inside it was ignored. So automatic VAD is disabled
- * server-side and THIS class decides when a turn ends, using local energy:
- *   - [silenceHoldMs] of continuous silence after speech  -> turn over
- *   - the UI also exposes a manual "Selesai bicara" button, because no energy
- *     threshold is right for every room.
+ * VOICE_COMMUNICATION audio source + AcousticEchoCanceler are used so the phone's
+ * speaker output is cancelled out by hardware/OS before reaching the microphone.
  */
 class StreamingRecorder(
     private val onLevel: ((Double) -> Unit)? = null,
@@ -33,22 +24,17 @@ class StreamingRecorder(
         private const val TAG = "StreamingRecorder"
         const val SAMPLE_RATE = 16_000
 
-        /** Emit audio in ~100 ms chunks: small enough to feel live. */
+        /** Emit audio in ~100 ms chunks. */
         private const val CHUNK_MS = 100
     }
 
     private var record: AudioRecord? = null
+    private var aec: AcousticEchoCanceler? = null
+    private var ns: NoiseSuppressor? = null
 
     @Volatile private var running = false
-    @Volatile private var speechSeen = false
 
-    /** Turn-boundary rule, shared with the unit tests. */
-    private val detector = TurnDetector()
-
-    /** True once speech has been detected during this capture. */
-    val speechDetected: Boolean get() = speechSeen
-
-    @SuppressLint("MissingPermission") // caller checks RECORD_AUDIO first
+    @SuppressLint("MissingPermission")
     fun start(): Boolean {
         val minBuf = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
@@ -59,7 +45,7 @@ class StreamingRecorder(
         }
         val rec = try {
             AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
@@ -73,29 +59,44 @@ class StreamingRecorder(
             rec.release()
             return false
         }
+
+        val audioSessionId = rec.audioSessionId
+        if (audioSessionId != 0) {
+            runCatching {
+                if (AcousticEchoCanceler.isAvailable()) {
+                    aec = AcousticEchoCanceler.create(audioSessionId)?.apply {
+                        enabled = true
+                        Log.i(TAG, "Hardware AcousticEchoCanceler enabled")
+                    }
+                }
+            }
+            runCatching {
+                if (NoiseSuppressor.isAvailable()) {
+                    ns = NoiseSuppressor.create(audioSessionId)?.apply {
+                        enabled = true
+                        Log.i(TAG, "Hardware NoiseSuppressor enabled")
+                    }
+                }
+            }
+        }
+
         record = rec
         running = true
-        speechSeen = false
         rec.startRecording()
         return true
     }
 
     /**
-     * Blocking capture loop. Call from a background thread.
-     *
-     * [onChunk] receives raw little-endian PCM16 bytes, ready to base64 and send.
-     * Returns true if any speech was detected before the turn ended.
+     * Continuous audio streaming loop. Runs until [stop] is called.
      */
-    fun streamUntilTurnEnd(onChunk: (ByteArray) -> Unit): Boolean {
-        val rec = record ?: return false
+    fun streamContinuous(onChunk: (ByteArray) -> Unit) {
+        val rec = record ?: return
         val samplesPerChunk = SAMPLE_RATE * CHUNK_MS / 1000
         val buffer = ShortArray(samplesPerChunk)
         val bytes = ByteArray(samplesPerChunk * 2)
 
         while (running) {
             var filled = 0
-            // AudioRecord.read may return fewer samples than asked; loop until the
-            // chunk is full so the stream stays evenly paced.
             while (filled < buffer.size && running) {
                 val read = rec.read(buffer, filled, buffer.size - filled)
                 if (read <= 0) break
@@ -111,27 +112,22 @@ class StreamingRecorder(
             val rms = sqrt(sumSq / filled)
             onLevel?.invoke(rms)
 
-            // pack to little-endian PCM16
             for (i in 0 until filled) {
                 val s = buffer[i].toInt()
                 bytes[i * 2] = (s and 0xff).toByte()
                 bytes[i * 2 + 1] = ((s shr 8) and 0xff).toByte()
             }
             onChunk(bytes.copyOf(filled * 2))
-
-            val frameMs = (filled * 1000L) / SAMPLE_RATE
-
-            // The turn rule lives in TurnDetector so it is unit-tested; see that
-            // class for why the threshold is what it is.
-            if (detector.onFrame(rms, frameMs)) break
-            speechSeen = detector.speechDetected
         }
-        speechSeen = detector.speechDetected
-        return speechSeen
     }
 
     fun stop() {
         running = false
+        runCatching { aec?.release() }
+        runCatching { ns?.release() }
+        aec = null
+        ns = null
+
         record?.let {
             runCatching {
                 if (it.recordingState == AudioRecord.RECORDSTATE_RECORDING) it.stop()

@@ -42,6 +42,16 @@ class StreamingPlayer {
     val isPlaying: Boolean get() = playing
 
     @Synchronized
+    fun clear() {
+        queue.clear()
+        runCatching {
+            track?.pause()
+            track?.flush()
+            track?.play()
+        }
+    }
+
+    @Synchronized
     fun start() {
         stop()
         val minBuf = AudioTrack.getMinBufferSize(
