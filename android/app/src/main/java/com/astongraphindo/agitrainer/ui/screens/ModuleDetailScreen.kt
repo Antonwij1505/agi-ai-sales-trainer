@@ -21,6 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -166,6 +172,8 @@ private fun ScenarioCard(
     onStart: () -> Unit,
     onStartLive: () -> Unit,
 ) {
+    var showTheory by remember { mutableStateOf(false) }
+
     GlassCard(Modifier.fillMaxWidth(), strong = true) {
         Column(Modifier.padding(18.dp)) {
             Text(
@@ -203,10 +211,18 @@ private fun ScenarioCard(
                 )
             }
 
+            // Button to show Theory & Passing Tips Dialog/Section
+            if (!s.theoryBriefing.isNullOrBlank() || !s.passingTips.isNullOrBlank()) {
+                Spacer(Modifier.height(10.dp))
+                TextButton(
+                    onClick = { showTheory = true },
+                    modifier = Modifier.padding(0.dp)
+                ) {
+                    Text("💡 Baca Teori & Arahan Agar Lulus", color = GlassColors.BlueStart, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
             Spacer(Modifier.height(14.dp))
-            // Speech-to-speech is the primary path: it sounds like a real phone call
-            // and replies noticeably faster. The turn-based mode stays available as a
-            // fallback because it works on a weaker connection.
             Button(
                 onClick = onStartLive,
                 shape = GlassShapes.button,
@@ -227,5 +243,32 @@ private fun ScenarioCard(
                 Text("Mode Lama (per giliran)")
             }
         }
+    }
+
+    if (showTheory) {
+        AlertDialog(
+            onDismissRequest = { showTheory = false },
+            title = { Text("Teori & Arahan Kelulusan", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    s.theoryBriefing?.let {
+                        Text("Teori & Konsep B2G:", fontWeight = FontWeight.Bold, color = GlassColors.TextDark)
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = GlassColors.TextMuted)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    s.passingTips?.let {
+                        Text("Arahan Agar Lulus:", fontWeight = FontWeight.Bold, color = GlassColors.TextDark)
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = GlassColors.TextMuted)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showTheory = false }) {
+                    Text("Paham & Mulai Latihan")
+                }
+            }
+        )
     }
 }
