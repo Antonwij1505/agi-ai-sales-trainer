@@ -255,3 +255,15 @@ di sini adalah **jalur evaluasinya berfungsi**, bukan nilai akhirnya.
 
 Catatan: nama field di API adalah `overall_score` (bukan `score`), dan status
 tersimpan di kolom `status`. Kesalahan baca skrip saya sendiri, bukan bug backend.
+
+### Uji keamanan relay
+
+| Uji | Hasil |
+|---|---|
+| Token tanpa tanda tangan sah | ditolak saat handshake (401) |
+| Token sah tapi sesi milik orang lain | ditolak: "Sesi ini bukan milik Anda." |
+| Sesi tidak ada | ditolak: "Sesi tidak ditemukan." |
+| Token di query string | tidak masuk access log (morgan skip path relay) |
+
+Cek kepemilikan memakai perbandingan `Number()` karena PostgreSQL mengembalikan
+`bigint` sebagai string — perbandingan langsung akan selalu gagal.
