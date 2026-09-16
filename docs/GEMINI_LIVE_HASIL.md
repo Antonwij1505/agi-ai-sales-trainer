@@ -157,3 +157,75 @@ Gemini Live **menjawab keluhan secara nyata**, tapi bukan karena kecepatan:
 
 Ini perubahan arsitektur, bukan penggantian voice, dan butuh pekerjaan Android
 yang signifikan sebelum bisa dipakai sales.
+
+---
+
+## Integrasi Android (setelah prototipe)
+
+Prototipe di atas diuji dari server. Bagian ini mencatat integrasi sebenarnya ke
+aplikasi Android dan apa yang sudah/belum terbukti.
+
+### Arsitektur
+
+Aplikasi **tidak** bicara langsung ke Google. HP membuka WebSocket ke backend kita,
+backend memegang sesi Gemini, dan frame diteruskan dua arah:
+
+```
+Android  ──ws──>  trainer backend (:4100)  ──wss──>  Gemini Live
+   ▲                      │
+   └──── audio + transkrip ┘
+```
+
+Alasannya bukan sekadar kerapian:
+1. PRD §78 — APK tidak boleh berisi kredensial. Key tetap di server.
+2. Key bisa dirotasi dari `filter_config` tanpa merilis APK baru.
+3. Backend perlu melihat transkrip agar penilaian per-kompetensi tetap jalan.
+
+### Protokol relay
+
+Klien → server: `{"t":"start"}` (implisit saat connect), `{"t":"audio","pcm":"<base64>"}`,
+`{"t":"turn_start"}`, `{"t":"turn_end"}`, `{"t":"stop"}`
+
+Server → klien: `{"t":"ready"}`, `{"t":"audio","pcm":"..."}`,
+`{"t":"transcript","speaker":"SALES"|"CS","text":"..."}`, `{"t":"turn_end"}`,
+`{"t":"error","message":"..."}`
+
+### Yang sudah TERBUKTI
+
+Diuji dari emulator Android sungguhan (bukan mock), lewat WebSocket, ke Gemini asli:
+
+| Yang diuji | Hasil |
+|---|---|
+| Token palsu | ditolak saat handshake |
+| Kalimat 9,7 detik | **didengar utuh** (tidak terpotong VAD) |
+| Audio balasan | 133–184 chunk, tiba ~5× lebih cepat dari real-time |
+| Transkrip | tersimpan ke `trainer_turns` |
+| Lewat Cloudflare | `wss://trainer.orimax.co.id` berhasil |
+| Audit APK | tidak ada key, tidak ada host Google |
+
+Bukti transkrip dari sesi uji (session 67):
+
+```
+SALES: Selamat pagi, Bu. Saya Adi dari Orimas. Boleh bicara dengan bagian
+       pengadaan IT? Kalau boleh, saya juga mau minta nomor kontak Pak Agus ya Bu.
+CS   : Wah, Pak Agus lagi tidak ada nih. Bagian pengadaan juga sedang rapat.
+```
+
+Perhatikan: kalimat sales **utuh** sampai permintaan nomor kontak, dan CS menjawab
+dengan partikel lisan ("nih"). Inilah yang membedakan dari pipeline lama.
+
+### Keputusan: VAD otomatis dimatikan
+
+Karena VAD otomatis Gemini terbukti memotong giliran di tengah kalimat, aplikasi
+yang menentukan batas giliran:
+- deteksi keheningan lokal (1,2 detik) mengakhiri giliran, dan
+- tombol **"Selesai bicara"** selalu tersedia, karena tidak ada ambang batas energi
+  yang cocok untuk semua ruangan.
+
+### Yang BELUM terbukti
+
+- **Belum pernah dijalankan di HP sungguhan.** Emulator di server ini tidak bisa
+  menerima input mikrofon, jadi pengambilan suara dari mikrofon asli belum diuji.
+  Yang sudah diuji adalah semua tahap SETELAH capture.
+- Kuota harian free tier belum diketahui batasnya.
+- Mode lama (per giliran) tetap dipertahankan sebagai cadangan untuk koneksi lemah.

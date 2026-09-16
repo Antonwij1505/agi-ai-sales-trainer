@@ -49,9 +49,24 @@ class LiveRelayTest {
         val tokenStore = TokenStore(ctx)
         val api = TrainerApi(tokenStore)
 
-        // Reuse the stored session token; skip if nobody has logged in on this device.
-        val token = tokenStore.token()
-        assumeTrue("tidak ada token login — uji dilewati", !token.isNullOrBlank())
+        // Reuse a stored session token when the device is already logged in.
+        // Otherwise accept credentials as instrumentation arguments, so no password
+        // is ever committed to the repository:
+        //   adb shell am instrument -e username admin -e password '***' ...
+        var token = tokenStore.token()
+        if (token.isNullOrBlank()) {
+            val args = InstrumentationRegistry.getArguments()
+            val user = args.getString("username")
+            val pass = args.getString("password")
+            if (!user.isNullOrBlank() && !pass.isNullOrBlank()) {
+                token = runCatching { runBlocking { api.login(user, pass).first } }
+                    .getOrNull()
+            }
+        }
+        assumeTrue(
+            "tidak ada token — jalankan dengan -e username/-e password, uji dilewati",
+            !token.isNullOrBlank(),
+        )
 
         // scenario 2 exists in the seeded data.
         val started = runBlocking {
