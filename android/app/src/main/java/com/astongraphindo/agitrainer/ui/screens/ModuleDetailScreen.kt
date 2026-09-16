@@ -17,6 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ fun ModuleDetailScreen(
     loading: Boolean,
     error: String?,
     onStart: (Int) -> Unit,
+    onStartLive: (Int) -> Unit,
 ) {
     if (loading || detail == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -80,7 +82,7 @@ fun ModuleDetailScreen(
         }
 
         items(detail.scenarios, key = { it.id }) { s ->
-            ScenarioCard(s) { onStart(s.id) }
+            ScenarioCard(s, onStart = { onStart(s.id) }, onStartLive = { onStartLive(s.id) })
         }
 
         item {
@@ -113,7 +115,11 @@ fun ModuleDetailScreen(
 }
 
 @Composable
-private fun ScenarioCard(s: Scenario, onStart: () -> Unit) {
+private fun ScenarioCard(
+    s: Scenario,
+    onStart: () -> Unit,
+    onStartLive: () -> Unit,
+) {
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
         Column(Modifier.padding(16.dp)) {
             Text(s.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -139,8 +145,15 @@ private fun ScenarioCard(s: Scenario, onStart: () -> Unit) {
             }
 
             Spacer(Modifier.height(12.dp))
-            Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                Text("Mulai Latihan Suara")
+            // Speech-to-speech is the primary path: it sounds like a real phone call
+            // and replies noticeably faster. The turn-based mode stays available as a
+            // fallback because it works on a weaker connection.
+            Button(onClick = onStartLive, modifier = Modifier.fillMaxWidth()) {
+                Text("Latihan Suara Langsung")
+            }
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+                Text("Mode Lama (per giliran)")
             }
         }
     }

@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { runMigrations } from './db/migrate.js';
 import { pool } from './db/pool.js';
+import { attachLiveRelay } from './routes/live.routes.js';
 
 async function main(): Promise<void> {
   // Apply migrations before serving traffic (idempotent).
@@ -11,6 +12,9 @@ async function main(): Promise<void> {
   const server = app.listen(env.PORT, () => {
     console.log(`AGI Trainer backend listening on :${env.PORT} (${env.NODE_ENV})`);
   });
+
+  // WebSocket relay for Gemini Live (speech-to-speech) rides the same port.
+  attachLiveRelay(server);
 
   const shutdown = (signal: string): void => {
     console.log(`${signal} received — shutting down.`);

@@ -23,6 +23,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.4.0",
     "pg": "^8.13.1",
+    "ws": "^8.21.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -32,6 +33,7 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.11.10",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },

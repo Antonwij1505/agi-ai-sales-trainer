@@ -206,6 +206,40 @@ function buildSystemMessage(
     .join('\n\n');
 }
 
+/**
+ * Build the system instruction for a Live (speech-to-speech) session.
+ *
+ * Reuses the SAME prompt rows as the text pipeline, so persona/scenario/rules stay
+ * consistent between modes, plus a spoken-style addendum the audio model needs
+ * (it must not read out markdown, and must not re-greet every turn).
+ */
+export async function buildLiveSystemInstruction(
+  scenario: ScenarioContext,
+  resistance: number,
+): Promise<string> {
+  const [prompts, productKnowledge] = await Promise.all([
+    getActivePromptSet(),
+    loadProductKnowledge(scenario.product_category),
+  ]);
+
+  const base = buildSystemMessage(scenario, prompts, productKnowledge, resistance);
+
+  return [
+    base,
+    [
+      'ATURAN SUARA (penting):',
+      '- Ini percakapan TELEPON. Bicara seperti orang Indonesia sungguhan: santai, luwes.',
+      '- Maksimal 1-2 kalimat pendek per balasan. Jangan berpidato.',
+      '- JANGAN menyapa ulang di setiap balasan ("Selamat pagi" cukup sekali di awal).',
+      '- Jangan pernah menyebut bahwa kamu AI, model, atau program.',
+      '- Jangan membacakan daftar, markdown, tanda bintang, atau tanda kurung.',
+      '- Kalau sales memotong ucapanmu, berhenti bicara dan dengarkan.',
+    ].join('\n'),
+  ]
+    .filter((s) => s.trim().length > 0)
+    .join('\n\n');
+}
+
 /** Opening line: deterministic, instant, cannot hallucinate. */
 export async function openingTurn(
   sessionId: number,

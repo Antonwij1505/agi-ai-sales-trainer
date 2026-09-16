@@ -42,6 +42,15 @@ const envSchema = z.object({
   TTS_VOICE: z.string().default('id-ID-GadisNeural'),
   // Slight speed-up: default edge-tts pacing sounds stiff/robotic on the phone.
   TTS_RATE: z.string().default('+8%'),
+
+  // Gemini Live — speech-to-speech. Key lives server-side only (PRD §78).
+  LIVE_API_KEY: z.string().default(''),
+  LIVE_MODEL: z.string().default('models/gemini-2.5-flash-native-audio-latest'),
+  LIVE_VOICE: z.string().default('Puck'),
+  // Keep automatic VAD OFF by default: it truncates turns at mid-sentence pauses.
+  LIVE_DISABLE_AUTO_VAD: z.string().default('true'),
+  // Hard cap on one Live session, so a forgotten socket cannot burn quota.
+  LIVE_MAX_SESSION_MS: z.coerce.number().int().positive().default(900_000),
 });
 
 const parsed = envSchema.safeParse(process.env);

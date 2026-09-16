@@ -19,6 +19,7 @@ interface Cached<T> {
 
 let aiCache: Cached<AiConfig> | undefined;
 let sttCache: Cached<SttConfig> | undefined;
+let liveCache: Cached<LiveConfig> | undefined;
 
 export interface AiConfig {
   provider: string;
@@ -34,6 +35,20 @@ export interface SttConfig {
   apiKey: string;
   model: string;
   language: string;
+}
+
+/**
+ * Gemini Live (speech-to-speech) config.
+ *
+ * The Android client never sees `apiKey`: it speaks to our WebSocket relay, which
+ * opens the upstream Live session (PRD §78 — zero secrets in the APK).
+ */
+export interface LiveConfig {
+  apiKey: string;
+  model: string;
+  voice: string;
+  /** Explicit turn control is required: automatic VAD cuts turns mid-sentence. */
+  disableAutoVad: boolean;
 }
 
 async function readConfigMap(keys: string[]): Promise<Record<string, string>> {
@@ -111,8 +126,39 @@ export async function getSttConfig(): Promise<SttConfig> {
   return value;
 }
 
+/**
+ * Gemini Live config.
+ *
+ * Precedence: trainer-specific keys → env. Deliberately does NOT fall back to the
+ * shared `ai_api_key`: that key belongs to the 9router gateway, which cannot proxy
+ * the Live API (it only advertises `generateContent`). Using it here would fail at
+ * connect time with a confusing error.
+ */
+export async function getLiveConfig(): Promise<LiveConfig> {
+  if (liveCache && Date.now() - liveCache.at < CACHE_TTL_MS) return liveCache.value;
+
+  const db = await readConfigMap([
+    'trainer_live_api_key',
+    'trainer_live_model',
+    'trainer_live_voice',
+    'trainer_live_disable_auto_vad',
+  ]);
+
+  const value: LiveConfig = {
+    apiKey: db.trainer_live_api_key || env.LIVE_API_KEY,
+    model: db.trainer_live_model || env.LIVE_MODEL,
+    voice: db.trainer_live_voice || env.LIVE_VOICE,
+    // Default true: measured that automatic VAD truncates turns mid-sentence.
+    disableAutoVad: (db.trainer_live_disable_auto_vad ?? String(env.LIVE_DISABLE_AUTO_VAD)) !== 'false',
+  };
+
+  liveCache = { at: Date.now(), value };
+  return value;
+}
+
 /** Test/ops helper — force the next read to hit the database. */
 export function clearCredentialCache(): void {
   aiCache = undefined;
   sttCache = undefined;
+  liveCache = undefined;
 }

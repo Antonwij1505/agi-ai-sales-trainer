@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.astongraphindo.agitrainer.ui.screens.DashboardScreen
 import com.astongraphindo.agitrainer.ui.screens.LiveSessionScreen
+import com.astongraphindo.agitrainer.ui.screens.LiveVoiceScreen
 import com.astongraphindo.agitrainer.ui.screens.LoginScreen
 import com.astongraphindo.agitrainer.ui.screens.ModuleDetailScreen
 import com.astongraphindo.agitrainer.ui.screens.ProgressScreen
@@ -24,11 +25,15 @@ object Routes {
     const val PROGRESS = "progress"
     const val MODULE = "module/{moduleId}"
     const val SESSION = "session/{scenarioId}/{scenarioName}"
+    /** Speech-to-speech (Gemini Live) roleplay. */
+    const val LIVE = "live/{scenarioId}/{scenarioName}"
     const val RESULT = "result/{sessionId}"
 
     fun module(id: Int) = "module/$id"
     fun session(scenarioId: Int, name: String) =
         "session/$scenarioId/${java.net.URLEncoder.encode(name, "UTF-8")}"
+    fun live(scenarioId: Int, name: String) =
+        "live/$scenarioId/${java.net.URLEncoder.encode(name, "UTF-8")}"
     fun result(sessionId: Int) = "result/$sessionId"
 }
 
@@ -127,6 +132,11 @@ fun AppNav() {
                         ?.firstOrNull { it.id == scenarioId }?.name ?: "Latihan"
                     nav.navigate(Routes.session(scenarioId, name))
                 },
+                onStartLive = { scenarioId ->
+                    val name = detail.detail?.scenarios
+                        ?.firstOrNull { it.id == scenarioId }?.name ?: "Latihan"
+                    nav.navigate(Routes.live(scenarioId, name))
+                },
             )
             androidx.compose.runtime.LaunchedEffect(id) { vm.loadModule(id) }
         }
@@ -143,6 +153,29 @@ fun AppNav() {
             val scenarioName = java.net.URLDecoder.decode(rawName, "UTF-8")
             LiveSessionScreen(
                 api = vm.api,
+                scenarioId = scenarioId,
+                scenarioName = scenarioName,
+                onFinished = { sessionId ->
+                    nav.navigate(Routes.result(sessionId)) {
+                        popUpTo(Routes.DASHBOARD)
+                    }
+                },
+            )
+        }
+
+        composable(
+            Routes.LIVE,
+            arguments = listOf(
+                navArgument("scenarioId") { type = NavType.IntType },
+                navArgument("scenarioName") { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val scenarioId = entry.arguments?.getInt("scenarioId") ?: 0
+            val rawName = entry.arguments?.getString("scenarioName").orEmpty()
+            val scenarioName = java.net.URLDecoder.decode(rawName, "UTF-8")
+            LiveVoiceScreen(
+                api = vm.api,
+                tokenStore = vm.tokenStore,
                 scenarioId = scenarioId,
                 scenarioName = scenarioName,
                 onFinished = { sessionId ->

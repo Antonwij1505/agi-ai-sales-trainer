@@ -23,7 +23,13 @@ export function createApp(): express.Application {
   // here, one client could buffer gigabytes of JSON into memory.
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: false, limit: '256kb' }));
-  app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+  // Skip the Live relay: clients may pass their JWT as ?token=, which must not
+  // end up in the access log.
+  app.use(
+    morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+      skip: (req) => req.url?.startsWith('/api/trainer/live/') === true,
+    }),
+  );
 
   // Public
   app.use('/health', healthRouter);
