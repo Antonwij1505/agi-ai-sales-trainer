@@ -31,6 +31,31 @@ PRD: v1.0 · Arsitektur: [`docs/ARCHITECTURE_PROPOSAL.md`](docs/ARCHITECTURE_PRO
 
 **Semua 13 stage (0–12) selesai.**
 
+## Mode suara langsung (Gemini Live) — v0.2.0
+
+Pipeline lama (`STT → LLM → TTS`) menghasilkan suara yang terasa "seperti robot".
+Penyebabnya arsitektural, bukan soal pilihan voice: konversi ke teks membuang nada
+bicara, dan tiga tahap berurutan menambah jeda.
+
+Mode **Latihan Suara Langsung** memakai Gemini Live (speech-to-speech): audio masuk,
+audio keluar, satu model. Bandingkan balasan untuk pertanyaan sales yang sama:
+
+| | Balasan |
+|---|---|
+| Pipeline | "Baik, saya bantu arahkan. Untuk pengadaan IT, biasanya ditangani oleh…" |
+| Live | "Oh, soal pengadaan IT? Biasanya Pak Agus di bagian perencanaan **sih** yang urus." |
+
+Detail pengukuran dan keputusan: [`docs/GEMINI_LIVE_HASIL.md`](docs/GEMINI_LIVE_HASIL.md).
+
+**Penting — VAD otomatis dimatikan.** Pengukuran menunjukkan VAD bawaan Gemini
+menyala di jeda tengah kalimat: satu kalimat 9,7 detik hanya terdengar ~2 detik
+pertama, dan permintaan kedua di dalamnya diabaikan. Karena itu aplikasi yang
+menentukan batas giliran (deteksi keheningan lokal + tombol **"Selesai bicara"**).
+
+Aplikasi **tidak** pernah memegang API key: HP membuka WebSocket ke backend kita,
+backend yang memegang sesi Gemini (PRD §78). Terverifikasi: APK tidak memuat key
+maupun host Google.
+
 ## Verifikasi di emulator (bukan sekadar kompilasi)
 
 APK dijalankan di emulator Android 14 (x86_64, headless) dan alurnya didorong
@@ -76,6 +101,14 @@ Loopback mikrofon virtual di sisi host **sudah terbukti bekerja** (capture
    merekam dan audio sampai ke server (uji HP pertama menemukan bug STT Deepgram
    yang sudah diperbaiki). Yang belum: percakapan suara penuh sampai layar Hasil
    di HP, kualitas rekaman di ruangan bising, dan latensi jaringan seluler.
+4. **Mode suara langsung belum pernah dijalankan di HP sungguhan.** Semua tahap
+   SETELAH capture sudah terbukti lewat test instrumentasi di emulator
+   (`LiveRelayTest`: WebSocket nyata → relay → Gemini, kalimat 9,7 detik terdengar
+   utuh, balasan streaming, transkrip tersimpan). Yang belum: pengambilan suara dari
+   mikrofon asli, karena emulator di server ini tidak bisa menerima input mikrofon.
+5. **Kuota harian free tier Gemini belum diketahui batasnya.** 60 sesi beruntun
+   lolos tanpa rate limit, tapi 60 sesi setup bukan 60 sesi latihan penuh. Google
+   memakai data free tier untuk melatih model — sudah disetujui untuk dipakai.
 
 ## Arsitektur singkat
 
