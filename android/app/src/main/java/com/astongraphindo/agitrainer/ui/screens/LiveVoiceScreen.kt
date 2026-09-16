@@ -138,11 +138,17 @@ fun LiveVoiceScreen(
                 is LiveClient.Event.Ready -> phase = LivePhase.IDLE
 
                 is LiveClient.Event.Audio -> {
-                    // Start playback on the first chunk and keep feeding it, so the
-                    // customer is heard while the rest is still being generated.
-                    if (!player.isPlaying) player.start()
-                    player.write(ev.pcm)
-                    phase = LivePhase.SPEAKING
+                    // Barge-in: while the rep is speaking we must NOT play incoming
+                    // audio. The model keeps emitting for the interrupted turn, and
+                    // without this guard each late chunk would restart playback —
+                    // the customer would talk over the rep.
+                    if (phase == LivePhase.LISTENING) {
+                        // ignore
+                    } else {
+                        if (!player.isPlaying) player.start()
+                        player.write(ev.pcm)
+                        phase = LivePhase.SPEAKING
+                    }
                 }
 
                 is LiveClient.Event.Transcript -> {
