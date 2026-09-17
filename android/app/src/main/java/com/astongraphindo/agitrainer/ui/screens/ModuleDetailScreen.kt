@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -362,28 +364,38 @@ private fun TheoryDialog(
         },
         title = { Text("Teori & Mentor AI", fontWeight = FontWeight.Bold) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                s.theoryBriefing?.let {
-                    Text("Teori materi ini:", fontWeight = FontWeight.Bold, color = GlassColors.TextDark)
-                    Spacer(Modifier.height(4.dp))
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = GlassColors.TextMuted)
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { speak(it) }) {
-                            Text(if (speaking) "Memutar..." else "🔊 Dengarkan Teori")
+            Column {
+                // Teori dibatasi tinggi + bisa di-scroll, supaya kolom "Tanya Mentor"
+                // di bawahnya SELALU terlihat tanpa harus menggulir jauh.
+                Column(
+                    Modifier
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    s.theoryBriefing?.let {
+                        Text("Teori materi ini:", fontWeight = FontWeight.Bold, color = GlassColors.TextDark)
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = GlassColors.TextMuted)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { speak(it) }) {
+                                Text(if (speaking) "Memutar..." else "🔊 Dengarkan Teori")
+                            }
+                            if (speaking) {
+                                OutlinedButton(onClick = { stopSpeak() }) { Text("Stop") }
+                            }
                         }
-                        if (speaking) {
-                            OutlinedButton(onClick = { stopSpeak() }) { Text("Stop") }
-                        }
+                        Spacer(Modifier.height(12.dp))
                     }
-                    Spacer(Modifier.height(12.dp))
+                    s.passingTips?.let {
+                        Text("Arahan agar lulus:", fontWeight = FontWeight.Bold, color = GlassColors.TextDark)
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = GlassColors.TextMuted)
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
-                s.passingTips?.let {
-                    Text("Arahan agar lulus:", fontWeight = FontWeight.Bold, color = GlassColors.TextDark)
-                    Spacer(Modifier.height(4.dp))
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = GlassColors.TextMuted)
-                    Spacer(Modifier.height(12.dp))
-                }
+                HorizontalDivider(color = GlassColors.TextMuted.copy(alpha = 0.25f))
+                Spacer(Modifier.height(10.dp))
                 Text(
                     "Tanya mentor (hanya seputar materi \"${s.name}\"):",
                     fontWeight = FontWeight.Bold,
