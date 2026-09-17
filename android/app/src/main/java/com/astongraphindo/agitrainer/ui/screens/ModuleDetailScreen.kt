@@ -369,7 +369,7 @@ private fun TheoryDialog(
                 // di bawahnya SELALU terlihat tanpa harus menggulir jauh.
                 Column(
                     Modifier
-                        .heightIn(max = 240.dp)
+                        .heightIn(max = 340.dp)
                         .verticalScroll(rememberScrollState()),
                 ) {
                     s.theoryBriefing?.let {
