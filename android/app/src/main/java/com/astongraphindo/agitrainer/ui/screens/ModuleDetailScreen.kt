@@ -228,15 +228,29 @@ private fun ScenarioCard(
             }
 
             if (!s.theoryBriefing.isNullOrBlank() || !s.passingTips.isNullOrBlank()) {
-                Spacer(Modifier.height(10.dp))
-                TextButton(
+                Spacer(Modifier.height(12.dp))
+                Button(
                     onClick = { showTheory = true },
-                    modifier = Modifier.padding(0.dp)
+                    shape = GlassShapes.button,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = GlassColors.Amber,
+                        contentColor = GlassColors.TextDark,
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                 ) {
                     Text(
-                        "🔊 Dengar Teori & Tanya Mentor",
-                        color = GlassColors.BlueStart,
-                        style = MaterialTheme.typography.labelMedium,
+                        "💡 Baca Teori & Arahan Agar Lulus",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                s.theoryBriefing?.let { tb ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        tb,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GlassColors.TextMuted,
+                        maxLines = 3,
                     )
                 }
             }

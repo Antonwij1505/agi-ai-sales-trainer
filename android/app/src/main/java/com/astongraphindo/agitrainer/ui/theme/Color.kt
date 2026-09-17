@@ -11,6 +11,10 @@ object GlassColors {
     val CyanStart = Color(0xFF00D2FF)
     val GreenEnd = Color(0xFF2AF598)
 
+    /** Highlight color for the theory / passing-tips call to action. */
+    val Amber = Color(0xFFFFC53D)
+    val AmberEnd = Color(0xFFFFA726)
+
     val Background = Color(0xFFF5F7FA)
     val GlassFill = Color(0x66FFFFFF)
     val GlassFillStrong = Color(0xCCFFFFFF)
