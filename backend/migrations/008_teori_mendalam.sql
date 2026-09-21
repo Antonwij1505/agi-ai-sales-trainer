@@ -4,6 +4,9 @@
 
 BEGIN;
 
+ALTER TABLE trainer_scenarios ADD COLUMN IF NOT EXISTS theory_briefing TEXT;
+ALTER TABLE trainer_scenarios ADD COLUMN IF NOT EXISTS passing_tips TEXT;
+
 -- ============ MOD-01: First Call ke PPK berdasarkan Kode RUP ============
 UPDATE trainer_scenarios SET
 theory_briefing = $t$APA ITU COLD CALL B2G?

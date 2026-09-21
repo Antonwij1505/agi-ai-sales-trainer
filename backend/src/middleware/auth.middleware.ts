@@ -11,7 +11,7 @@ import { HttpError } from './error.middleware.js';
 export interface AuthJwtPayload {
   sub: number;
   username: string;
-  role: 'admin' | 'sales' | 'spv' | 'manager';
+  role: 'admin' | 'super_admin' | 'management' | 'hr_manager' | 'sales_supervisor' | 'trainer' | 'sales' | 'spv' | 'manager';
   nama_lengkap: string;
   provinsi_list?: string[];
   kabkota_list?: string[];

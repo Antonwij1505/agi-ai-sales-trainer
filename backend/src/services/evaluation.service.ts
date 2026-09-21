@@ -15,6 +15,7 @@ import {
 import { getAiConfig } from '../config/credentials.js';
 import { recomputeProgress } from './progress.service.js';
 import { buildResultPayload, closeAssignmentIfPassed, enqueueResult } from './integration.service.js';
+import { syncSessionToOdoo } from './odoo-sync.service.js';
 
 /**
  * Evaluation Engine (Stage 7, PRD §33–§38, §63–§64).
@@ -281,6 +282,10 @@ export async function evaluateSession(sessionId: number): Promise<EvaluationResu
     const payload = await buildResultPayload(sessionId);
     if (payload) await enqueueResult(sessionId, payload);
     await closeAssignmentIfPassed(session.sales_id, scenario.module_id, passed);
+    // Sinkronkan ke Odoo 16 secara instan
+    syncSessionToOdoo(sessionId).catch((e) => {
+      console.error(`[odoo-sync] background sync error:`, (e as Error).message);
+    });
   } catch (err) {
     console.error(`[integrasi] gagal enqueue hasil sesi ${sessionId}:`, (err as Error).message);
   }

@@ -7,6 +7,13 @@ import { env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/error.middleware.js';
 import { requireAuth } from './middleware/auth.middleware.js';
 import { adminRouter } from './routes/admin.routes.js';
+import { employeeRouter } from './routes/employee.routes.js';
+import { competencyRouter } from './routes/competency.routes.js';
+import { crmRouter } from './routes/crm.routes.js';
+import { aiAnalysisRouter } from './routes/ai_analysis.routes.js';
+import { tnaRouter } from './routes/tna.routes.js';
+import { trainingRouter } from './routes/training.routes.js';
+import { kpiDashboardRouter } from './routes/kpi_dashboard.routes.js';
 import { catalogRouter } from './routes/catalog.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { integrationRouter } from './routes/integration.routes.js';
@@ -37,6 +44,13 @@ export function createApp(): express.Application {
 
   // Authenticated (shared JWT from Sales Analytics)
   app.use('/api/trainer', catalogRouter);
+  app.use('/api/trainer', employeeRouter);
+  app.use('/api/trainer', competencyRouter);
+  app.use('/api/trainer', crmRouter);
+  app.use('/api/trainer', aiAnalysisRouter);
+  app.use('/api/trainer', tnaRouter);
+  app.use('/api/trainer', trainingRouter);
+  app.use('/api/trainer', kpiDashboardRouter);
   app.use('/api/trainer', sessionRouter);
   app.use('/api/trainer', progressRouter);
   app.use('/api/trainer', theoryRouter);
