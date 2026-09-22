@@ -58,10 +58,10 @@ async function runE2ETest() {
   assert(tna && tna.tna.length >= 0, 'Step 7: Generate TNA passed');
   console.log('✅ Step 7: Generate TNA passed');
 
-  // Step 8 & 9: Assign & Complete Training (using seed module ID 1)
+  // Step 8 & 9: Assign & Complete Training (using seed module MOD-01)
   await upsertAssignment({
     sales_id: salesId,
-    module_id: 1,
+    module_code: 'MOD-01',
     priority: 'high',
     external_ref: `EXT-E2E-${Date.now()}`,
     context: { source: 'tna' },
