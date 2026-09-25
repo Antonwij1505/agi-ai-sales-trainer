@@ -25,6 +25,9 @@ object GlassColors {
     val TextMuted = Color(0xFF6B7280)
     val OnGradient = Color(0xFFFFFFFF)
 
+    val Emerald = Color(0xFF10B981)
+    val Coral = Color(0xFFEF4444)
+
     val BlobBlue = Color(0x1F0081FF)
     val BlobCyan = Color(0x1A00D2FF)
     val BlobGreen = Color(0x142AF598)

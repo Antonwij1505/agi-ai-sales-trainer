@@ -40,7 +40,7 @@ android {
             if (port.isEmpty()) "$scheme://$host/" else "$scheme://$host:$port/"
 
         val apiScheme = (project.findProperty("apiScheme") as String?) ?: "http"
-        val apiHost = (project.findProperty("apiHost") as String?) ?: "10.0.2.2"
+        val apiHost = (project.findProperty("apiHost") as String?) ?: "192.168.88.12"
         val apiPort = (project.findProperty("apiPort") as String?) ?: "4100"
 
         val authScheme = (project.findProperty("authScheme") as String?) ?: apiScheme
@@ -57,11 +57,8 @@ android {
             isMinifyEnabled = false
         }
         release {
-            isMinifyEnabled = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

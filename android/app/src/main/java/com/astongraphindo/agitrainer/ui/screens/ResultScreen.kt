@@ -1,5 +1,6 @@
 package com.astongraphindo.agitrainer.ui.screens
 
+import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,15 +11,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,19 +32,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.astongraphindo.agitrainer.data.Evaluation
 import com.astongraphindo.agitrainer.data.TrainerApi
+import com.astongraphindo.agitrainer.ui.theme.GlassColors
+import com.astongraphindo.agitrainer.ui.theme.GlassShapes
+import java.util.Locale
 
-/**
- * Result + feedback screen (PRD §39–§49).
- *
- * Evaluation runs on entry (idempotent server-side, so re-entering is free).
- * This entry point owns the data loading; the actual UI is [ResultContent],
- * which is stateless and therefore renderable in a test without a network or a
- * completed voice conversation.
- */
 @Composable
 fun ResultScreen(
     api: TrainerApi,
@@ -69,12 +72,6 @@ fun ResultScreen(
     )
 }
 
-/**
- * The rendered result view. Pure function of its inputs so a Compose test can
- * drive it with a fixture evaluation — the screen was previously unreachable in
- * an emulator because completing a voice conversation requires real microphone
- * input, which the emulator cannot be given.
- */
 @Composable
 fun ResultContent(
     evaluation: Evaluation?,
@@ -83,12 +80,48 @@ fun ResultContent(
     onRetry: () -> Unit,
     onBackToDashboard: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var isSpeaking by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        val t = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                // Indonesian TTS
+            }
+        }
+        t.language = Locale("id", "ID")
+        tts = t
+        onDispose {
+            t.stop()
+            t.shutdown()
+        }
+    }
+
+    fun speakText(text: String) {
+        tts?.let {
+            if (it.isSpeaking) {
+                it.stop()
+                isSpeaking = false
+            } else {
+                it.language = Locale("id", "ID")
+                it.speak(text, TextToSpeech.QUEUE_FLUSH, null, "eval_audio")
+                isSpeaking = true
+            }
+        }
+    }
+
+    fun stopSpeaking() {
+        tts?.stop()
+        isSpeaking = false
+    }
+
     if (loading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = GlassColors.Amber)
                 Spacer(Modifier.height(12.dp))
-                Text("Menilai percakapan…", style = MaterialTheme.typography.bodyMedium)
+                Text("AI Coach sedang menganalisis sesi Anda…", style = MaterialTheme.typography.bodyMedium, color = GlassColors.TextDark)
             }
         }
         return
@@ -106,24 +139,19 @@ fun ResultContent(
         return
     }
 
-    // A plain scrolling Column, not a LazyColumn. The result page has a fixed,
-    // small number of items, so lazy virtualisation buys nothing — but it costs
-    // something: a LazyColumn only composes the items currently on screen, so on
-    // a small display (the CI emulator reports androidboot.qemu.skin=320x640) the
-    // lower sections do not exist in the semantics tree at all. Tests then cannot
-    // find or scroll to them, which made the suite resolution-dependent.
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // SCORE BANNER
         Box(
             Modifier
                 .fillMaxWidth()
                 .background(
-                    if (ev.passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    if (ev.passed) GlassColors.Emerald else GlassColors.Coral,
                     RoundedCornerShape(16.dp),
                 )
                 .padding(20.dp),
@@ -133,35 +161,122 @@ fun ResultContent(
                     "${ev.overallScore}",
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                 )
                 Text(
-                    if (ev.passed) "LULUS" else "BELUM LULUS",
+                    if (ev.passed) "🏆 LULUS STANDAR B2G" else "⚠️ BELUM LULUS (PERBAIKI SKRIP)",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
                 )
                 Text(
-                    "Nilai lulus: ${ev.passingScore}",
+                    "Batas lulus: ${ev.passingScore} · Standar ketat B2G",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White.copy(alpha = 0.9f),
                 )
             }
         }
 
-        Text("Penilaian per Kompetensi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        // REKOMENDASI DAN CONTOH KALIMAT YANG BENAR (HIGHLIGHT PALING ATAS)
+        if (ev.recommendation.isNotBlank()) {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = GlassColors.Amber.copy(alpha = 0.15f)),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "💡 Ajaran & Contoh Kalimat yang Benar",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = GlassColors.TextDark,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        ev.recommendation,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GlassColors.TextDark,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { speakText(ev.recommendation) },
+                            colors = ButtonDefaults.buttonColors(containerColor = GlassColors.Amber, contentColor = GlassColors.TextDark),
+                        ) {
+                            Text(if (isSpeaking) "🔊 Menjelaskan..." else "🔊 Dengarkan Arahan Coach AI", fontWeight = FontWeight.Bold)
+                        }
+                        if (isSpeaking) {
+                            OutlinedButton(onClick = { stopSpeaking() }) {
+                                Text("Stop")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // CRITICAL ERRORS (KESALAHAN FATAL)
+        if (ev.criticalErrors.isNotEmpty()) {
+            SectionBox(
+                title = "🚨 Kesalahan Fatal B2G (Hindari Bicara Seperti Ini):",
+                items = ev.criticalErrors,
+                bgColor = GlassColors.Coral.copy(alpha = 0.12f),
+                textColor = GlassColors.Coral,
+            )
+        }
+
+        // WEAKNESSES (KEKURANGAN SALES)
+        if (ev.weaknesses.isNotEmpty()) {
+            SectionBox(
+                title = "🔴 Hal yang Harus Diperbaiki:",
+                items = ev.weaknesses,
+                bgColor = Color(0xFFFFF3E0),
+                textColor = Color(0xFFE65100),
+            )
+        }
+
+        // STRENGTHS (POIN POSITIF)
+        if (ev.strengths.isNotEmpty()) {
+            SectionBox(
+                title = "🟢 Poin yang Sudah Baik:",
+                items = ev.strengths,
+                bgColor = GlassColors.Emerald.copy(alpha = 0.12f),
+                textColor = Color(0xFF1B5E20),
+            )
+        }
+
+        // PENILAIAN PER RUBRIK
+        Text(
+            "📊 Detail Penilaian Indikator Kompetensi",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = GlassColors.TextDark
+        )
 
         ev.competencies.forEach { c ->
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+            ) {
                 Column(Modifier.padding(14.dp)) {
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            c.competency.replace('_', ' '),
+                            c.competency.replace('_', ' ').uppercase(),
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
+                            color = GlassColors.TextDark,
                             modifier = Modifier.weight(1f),
                         )
                         Text(
@@ -169,66 +284,83 @@ fun ResultContent(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = when {
-                                c.score >= 80 -> MaterialTheme.colorScheme.primary
-                                c.score >= 50 -> MaterialTheme.colorScheme.tertiary
-                                else -> MaterialTheme.colorScheme.error
+                                c.score >= 75 -> GlassColors.Emerald
+                                c.score >= 50 -> Color(0xFFF57C00)
+                                else -> GlassColors.Coral
                             },
                         )
                     }
                     Text(
-                        "bobot ${c.weight}% · kontribusi ${c.weighted}",
+                        "Bobot ${c.weight}% · Kontribusi ${c.weighted} poin",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = GlassColors.TextMuted,
                     )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Bukti: ${c.evidence}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    if (c.evidence.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Kutipan Bukti: ${c.evidence}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GlassColors.TextMuted,
+                        )
+                    }
                 }
             }
         }
 
-        if (ev.strengths.isNotEmpty()) {
-            SectionList("Kekuatan", ev.strengths, MaterialTheme.colorScheme.primary)
-        }
-        if (ev.weaknesses.isNotEmpty()) {
-            SectionList("Perlu diperbaiki", ev.weaknesses, MaterialTheme.colorScheme.tertiary)
-        }
-        if (ev.criticalErrors.isNotEmpty()) {
-            SectionList("Kesalahan kritis", ev.criticalErrors, MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = {
+                stopSpeaking()
+                onRetry()
+            },
+            shape = GlassShapes.button,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GlassColors.Amber,
+                contentColor = GlassColors.TextDark,
+            ),
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+        ) {
+            Text(
+                if (ev.passed) "Latihan Ulang (Asah Lagi)" else "🔄 Latih Ulang dengan Skrip yang Benar",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+            )
         }
 
-        if (ev.recommendation.isNotBlank()) {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                Column(Modifier.padding(14.dp)) {
-                    Text("Rekomendasi Latihan", fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(ev.recommendation, style = MaterialTheme.typography.bodySmall)
-                }
-            }
+        OutlinedButton(
+            onClick = {
+                stopSpeaking()
+                onBackToDashboard()
+            },
+            shape = GlassShapes.button,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+        ) {
+            Text("Kembali ke Daftar Modul", style = MaterialTheme.typography.labelLarge)
         }
-
-        Spacer(Modifier.height(4.dp))
-        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
-            Text(if (ev.passed) "Latihan Lagi" else "Ulangi Latihan")
-        }
-        Spacer(Modifier.height(8.dp))
-        Button(onClick = onBackToDashboard, modifier = Modifier.fillMaxWidth()) {
-            Text("Kembali ke Daftar Modul")
-        }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
 @Composable
-private fun SectionList(title: String, items: List<String>, color: androidx.compose.ui.graphics.Color) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
-        Spacer(Modifier.height(4.dp))
-        items.forEach { s ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                Text("•  ", color = color)
-                Text(s, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+private fun SectionBox(
+    title: String,
+    items: List<String>,
+    bgColor: Color,
+    textColor: Color,
+) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = textColor)
+            Spacer(Modifier.height(6.dp))
+            items.forEach { s ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                    Text("• ", color = textColor, fontWeight = FontWeight.Bold)
+                    Text(s, style = MaterialTheme.typography.bodySmall, color = GlassColors.TextDark, modifier = Modifier.weight(1f))
+                }
             }
         }
     }
