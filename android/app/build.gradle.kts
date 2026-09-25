@@ -48,8 +48,8 @@ android {
         val authPort = (project.findProperty("authPort") as String?) ?: "4000"
 
         buildConfigField("String", "API_BASE_URL", "\"${url(apiScheme, apiHost, apiPort)}\"")
-        // Auth is served by the Sales Analytics backend (shared JWT contract).
-        buildConfigField("String", "AUTH_BASE_URL", "\"${url(authScheme, authHost, authPort)}\"")
+        // Auth langsung ke Trainer Backend (terkoneksi langsung ke Odoo XML-RPC).
+        buildConfigField("String", "AUTH_BASE_URL", "\"${url(apiScheme, apiHost, apiPort)}\"")
     }
 
     buildTypes {

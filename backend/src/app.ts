@@ -2,6 +2,11 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import { env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/error.middleware.js';
@@ -14,7 +19,9 @@ import { aiAnalysisRouter } from './routes/ai_analysis.routes.js';
 import { tnaRouter } from './routes/tna.routes.js';
 import { trainingRouter } from './routes/training.routes.js';
 import { kpiDashboardRouter } from './routes/kpi_dashboard.routes.js';
+import { authRouter } from './routes/auth.routes.js';
 import { catalogRouter } from './routes/catalog.routes.js';
+import { debriefRouter } from './routes/debrief.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { integrationRouter } from './routes/integration.routes.js';
 import { progressRouter } from './routes/progress.routes.js';
@@ -41,9 +48,12 @@ export function createApp(): express.Application {
 
   // Public
   app.use('/health', healthRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/download', express.static(path.join(__dirname, '../public')));
 
   // Authenticated (shared JWT from Sales Analytics)
   app.use('/api/trainer', catalogRouter);
+  app.use('/api/trainer', debriefRouter);
   app.use('/api/trainer', employeeRouter);
   app.use('/api/trainer', competencyRouter);
   app.use('/api/trainer', crmRouter);
