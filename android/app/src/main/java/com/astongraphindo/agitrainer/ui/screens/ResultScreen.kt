@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +41,10 @@ import com.astongraphindo.agitrainer.data.Evaluation
 import com.astongraphindo.agitrainer.data.TrainerApi
 import com.astongraphindo.agitrainer.ui.theme.GlassColors
 import com.astongraphindo.agitrainer.ui.theme.GlassShapes
-import java.util.Locale
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
+import kotlinx.coroutines.launch
 
 @Composable
 fun ResultScreen(
@@ -64,6 +68,8 @@ fun ResultScreen(
     }
 
     ResultContent(
+        api = api,
+        sessionId = sessionId,
         evaluation = evaluation,
         loading = loading,
         error = error,
@@ -74,6 +80,8 @@ fun ResultScreen(
 
 @Composable
 fun ResultContent(
+    api: TrainerApi? = null,
+    sessionId: Int = 0,
     evaluation: Evaluation?,
     loading: Boolean,
     error: String?,
@@ -81,38 +89,47 @@ fun ResultContent(
     onBackToDashboard: () -> Unit,
 ) {
     val context = LocalContext.current
-    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var player by remember { mutableStateOf(com.astongraphindo.agitrainer.audio.ReplyPlayer()) }
+    var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var isLoadingAudio by remember { mutableStateOf(false) }
     var isSpeaking by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
-        val t = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                // Indonesian TTS
-            }
-        }
-        t.language = Locale("id", "ID")
-        tts = t
-        onDispose {
-            t.stop()
-            t.shutdown()
-        }
+        onDispose { player.stop() }
     }
 
-    fun speakText(text: String) {
-        tts?.let {
-            if (it.isSpeaking) {
-                it.stop()
-                isSpeaking = false
-            } else {
-                it.language = Locale("id", "ID")
-                it.speak(text, TextToSpeech.QUEUE_FLUSH, null, "eval_audio")
-                isSpeaking = true
+    val scope = rememberCoroutineScope()
+
+    fun playCachedAudio(bytes: ByteArray) {
+        val tempFile = File(context.cacheDir, "eval_${UUID.randomUUID()}.mp3")
+        player.play(bytes, tempFile) {
+            isSpeaking = false
+            tempFile.delete()
+        }
+        isSpeaking = true
+    }
+
+    fun playAudio() {
+        if (audioBytes != null) {
+            playCachedAudio(audioBytes!!)
+        } else if (!isLoadingAudio && api != null && sessionId > 0 && evaluation?.recommendation?.isNotBlank() == true) {
+            scope.launch {
+                isLoadingAudio = true
+                try {
+                    val bytes = api.downloadEvaluationAudio(sessionId)
+                    audioBytes = bytes
+                    playCachedAudio(bytes)
+                } catch (_: Exception) {
+                    // Ignore fallback if network fails
+                } finally {
+                    isLoadingAudio = false
+                }
             }
         }
     }
 
     fun stopSpeaking() {
-        tts?.stop()
+        player.stop()
         isSpeaking = false
     }
 
@@ -208,10 +225,10 @@ fun ResultContent(
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = { speakText(ev.recommendation) },
+                            onClick = { playAudio() },
                             colors = ButtonDefaults.buttonColors(containerColor = GlassColors.Amber, contentColor = GlassColors.TextDark),
                         ) {
-                            Text(if (isSpeaking) "🔊 Menjelaskan..." else "🔊 Dengarkan Arahan Coach AI", fontWeight = FontWeight.Bold)
+                            Text(if (isLoadingAudio) "⏳ Memuat Audio..." else if (isSpeaking) "🔊 Menjelaskan..." else "🔊 Dengarkan Arahan Coach AI", fontWeight = FontWeight.Bold)
                         }
                         if (isSpeaking) {
                             OutlinedButton(onClick = { stopSpeaking() }) {

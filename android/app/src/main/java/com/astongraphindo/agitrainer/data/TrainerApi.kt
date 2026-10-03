@@ -174,6 +174,20 @@ class TrainerApi(private val tokenStore: TokenStore) {
         return Evaluation.from(o.getJSONObject("evaluation"))
     }
 
+    /** GET the coach's evaluation recommendation as a neural-TTS MP3. */
+    suspend fun downloadEvaluationAudio(sessionId: Int): ByteArray = withContext(Dispatchers.IO) {
+        val req = authed("/api/trainer/sessions/$sessionId/evaluation-audio").get().build()
+        client.newCall(req).execute().use { res ->
+            if (!res.isSuccessful) {
+                val body = res.body?.string().orEmpty()
+                val msg = runCatching { JSONObject(body).optString("error") }.getOrNull()?.ifBlank { null }
+                    ?: "HTTP ${res.code}"
+                throw ApiException(res.code, msg)
+            }
+            res.body?.bytes() ?: ByteArray(0)
+        }
+    }
+
     // ── Progress ────────────────────────────────────────────────────────────
 
     suspend fun progress(): List<ProgressEntry> {

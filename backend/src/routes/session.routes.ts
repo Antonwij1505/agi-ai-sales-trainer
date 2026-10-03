@@ -245,6 +245,27 @@ sessionRouter.get('/sessions/:id/evaluation', requireAuth, async (req, res, next
   }
 });
 
+/** GET /api/trainer/sessions/:id/evaluation-audio — get neural TTS audio for the evaluation recommendation. */
+sessionRouter.get('/sessions/:id/evaluation-audio', requireAuth, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const session = await getSession(id);
+    if (!session) throw new HttpError(404, 'Sesi tidak ditemukan.');
+    if (req.user!.role === 'sales' && session.sales_id !== req.user!.sub) {
+      throw new HttpError(403, 'Tidak boleh mengakses sesi sales lain.');
+    }
+    const evaluation = await loadEvaluation(id);
+    if (!evaluation || !evaluation.recommendation) {
+      throw new HttpError(404, 'Evaluasi atau rekomendasi belum tersedia.');
+    }
+    const tts = await synthesizeSpeech(evaluation.recommendation);
+    res.setHeader('Content-Type', tts.mimeType);
+    res.send(tts.buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** Map a browser/Android mime type to the extension whisper providers expect. */
 function guessExtension(mimeType: string, originalName: string): string {
   const fromName = originalName.includes('.') ? originalName.split('.').pop() : undefined;
