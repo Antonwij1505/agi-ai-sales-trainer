@@ -56,8 +56,11 @@ fun ResultScreen(
     var evaluation by remember { mutableStateOf<Evaluation?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var retryTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(sessionId) {
+    LaunchedEffect(sessionId, retryTick) {
+        loading = true
+        error = null
         try {
             evaluation = api.evaluate(sessionId)
         } catch (e: Exception) {
@@ -75,6 +78,7 @@ fun ResultScreen(
         error = error,
         onRetry = onRetry,
         onBackToDashboard = onBackToDashboard,
+        onRetryEvaluation = { retryTick++ },
     )
 }
 
@@ -87,6 +91,7 @@ fun ResultContent(
     error: String?,
     onRetry: () -> Unit,
     onBackToDashboard: () -> Unit,
+    onRetryEvaluation: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var player by remember { mutableStateOf(com.astongraphindo.agitrainer.audio.ReplyPlayer()) }
@@ -147,11 +152,17 @@ fun ResultContent(
     val ev = evaluation
     if (ev == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                error ?: "Evaluasi tidak tersedia.",
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(24.dp),
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    error ?: "Evaluasi tidak tersedia.",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(24.dp),
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onRetryEvaluation() }) {
+                    Text("Coba Lagi")
+                }
+            }
         }
         return
     }

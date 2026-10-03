@@ -350,9 +350,18 @@ fun LiveVoiceScreen(
                     phase = LivePhase.DONE
                     recorder.stop()
                     player.stop()
-                    scope.launch {
+                    scope.launch(Dispatchers.IO) {
+                        // Flush live transcript di server DULU sebelum finish/evaluate.
+                        // Buffer transkrip hanya ditulis ke DB saat relay terima
+                        // {"t":"stop"} atau socket ditutup — tanpa ini evaluate
+                        // baca 0 turns dan gagal.
+                        runCatching { live.stop() }
+                        kotlinx.coroutines.delay(800)
+                        runCatching { live.disconnect() }
                         runCatching { api.finish(sessionId) }
-                        onFinished(sessionId)
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            onFinished(sessionId)
+                        }
                     }
                 },
                 shape = GlassShapes.button,

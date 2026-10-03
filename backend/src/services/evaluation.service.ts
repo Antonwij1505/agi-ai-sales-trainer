@@ -188,7 +188,13 @@ export async function evaluateSession(sessionId: number): Promise<EvaluationResu
   let payload: EvaluationPayload | undefined;
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+  // Model utama bisa kena rate-limit 429 (quota harian). Fallback ke model
+  // ringan agar penilaian tetap keluar, bukan 500.
+  const candidates = [ai.modelEval, 'orimax_fast', 'gemini-free'].filter(
+    (m, i, arr) => !!m && arr.indexOf(m) === i,
+  );
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS * candidates.length; attempt += 1) {
+    const model = candidates[(attempt - 1) % candidates.length];
     try {
       const { data } = await chatJson<unknown>(
         [
@@ -196,7 +202,7 @@ export async function evaluateSession(sessionId: number): Promise<EvaluationResu
           { role: 'user', content: user },
         ],
         {
-          model: ai.modelEval,
+          model,
           temperature: 0.1,
           maxTokens: 2500,
           timeoutMs: 120_000,
