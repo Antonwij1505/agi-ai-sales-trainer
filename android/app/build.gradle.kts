@@ -12,8 +12,8 @@ android {
         applicationId = "com.astongraphindo.agitrainer"
         minSdk = 26          // AudioRecord + EncryptedSharedPreferences requirements
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.8.2"
+        versionCode = 11
+        versionName = "0.8.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -49,6 +49,13 @@ export interface LiveConfig {
   voice: string;
   /** Explicit turn control is required: automatic VAD cuts turns mid-sentence. */
   disableAutoVad: boolean;
+  /** Automatic-VAD tuning, used only when disableAutoVad is false. */
+  vad: {
+    silenceDurationMs: number;
+    startSensitivity: string;
+    endSensitivity: string;
+    prefixPaddingMs: number;
+  };
 }
 
 async function readConfigMap(keys: string[]): Promise<Record<string, string>> {
@@ -142,6 +149,10 @@ export async function getLiveConfig(): Promise<LiveConfig> {
     'trainer_live_model',
     'trainer_live_voice',
     'trainer_live_disable_auto_vad',
+    'trainer_live_vad_silence_ms',
+    'trainer_live_vad_start_sensitivity',
+    'trainer_live_vad_end_sensitivity',
+    'trainer_live_vad_prefix_padding_ms',
   ]);
 
   const value: LiveConfig = {
@@ -150,6 +161,12 @@ export async function getLiveConfig(): Promise<LiveConfig> {
     voice: db.trainer_live_voice || env.LIVE_VOICE,
     // Default true: measured that automatic VAD truncates turns mid-sentence.
     disableAutoVad: (db.trainer_live_disable_auto_vad ?? String(env.LIVE_DISABLE_AUTO_VAD)) !== 'false',
+    vad: {
+      silenceDurationMs: Number(db.trainer_live_vad_silence_ms ?? env.LIVE_VAD_SILENCE_MS),
+      startSensitivity: db.trainer_live_vad_start_sensitivity || env.LIVE_VAD_START_SENSITIVITY,
+      endSensitivity: db.trainer_live_vad_end_sensitivity || env.LIVE_VAD_END_SENSITIVITY,
+      prefixPaddingMs: Number(db.trainer_live_vad_prefix_padding_ms ?? env.LIVE_VAD_PREFIX_PADDING_MS),
+    },
   };
 
   liveCache = { at: Date.now(), value };

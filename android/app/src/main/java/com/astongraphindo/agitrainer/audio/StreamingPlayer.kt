@@ -27,13 +27,23 @@ class StreamingPlayer {
         /** Matches the Live API's output rate. */
         const val SAMPLE_RATE = 24_000
 
-        /** ~1 s of audio buffered at 24 kHz mono 16-bit. */
-        private const val QUEUE_BYTES = SAMPLE_RATE * 2
+        /**
+         * AudioTrack buffer: ~500 ms at 24 kHz mono 16-bit.
+         *
+         * This was 1 second (SAMPLE_RATE * 2). A shorter buffer means less stale
+         * audio to flush on barge-in, while still absorbing network jitter —
+         * Gemini streams the reply ~3-5x faster than real time (measured), so an
+         * underrun is not a concern at this size.
+         */
+        private const val BUFFER_BYTES = SAMPLE_RATE * 2 / 2
+
+        /** Queue depth: chunks of model audio, independent of the device buffer. */
+        private const val QUEUE_CHUNKS = 64
     }
 
     private var track: AudioTrack? = null
     private var feeder: Thread? = null
-    private val queue = ArrayBlockingQueue<ByteArray>(64)
+    private val queue = ArrayBlockingQueue<ByteArray>(QUEUE_CHUNKS)
 
     @Volatile private var playing = false
     @Volatile private var draining = false
@@ -59,7 +69,7 @@ class StreamingPlayer {
             AudioFormat.CHANNEL_OUT_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
         )
-        val bufSize = maxOf(minBuf, QUEUE_BYTES)
+        val bufSize = maxOf(minBuf, BUFFER_BYTES)
         val t = try {
             AudioTrack.Builder()
                 .setAudioAttributes(

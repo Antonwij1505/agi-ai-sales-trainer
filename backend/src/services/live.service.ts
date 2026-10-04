@@ -118,6 +118,21 @@ export class LiveSession {
         setup.realtimeInputConfig = {
           automaticActivityDetection: { disabled: true },
         };
+      } else {
+        // Send explicit automatic-VAD tuning. Without it Gemini uses an aggressive
+        // default that closes the turn at the first natural pause, so a single
+        // sentence is transcribed in fragments and truncated — the CS then answers
+        // the wrong half. Measured with scripts/sweep_vad.py: default = 7 fragments
+        // and the tail keyword lost; the settings below = one complete turn.
+        setup.realtimeInputConfig = {
+          automaticActivityDetection: {
+            disabled: false,
+            silenceDurationMs: cfg.vad.silenceDurationMs,
+            startOfSpeechSensitivity: cfg.vad.startSensitivity,
+            endOfSpeechSensitivity: cfg.vad.endSensitivity,
+            prefixPaddingMs: cfg.vad.prefixPaddingMs,
+          },
+        };
       }
       upstream.send(JSON.stringify({ setup }));
     });

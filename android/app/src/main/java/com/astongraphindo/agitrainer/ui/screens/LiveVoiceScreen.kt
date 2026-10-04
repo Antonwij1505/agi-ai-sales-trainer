@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.astongraphindo.agitrainer.audio.StreamingPlayer
 import com.astongraphindo.agitrainer.audio.StreamingRecorder
+import com.astongraphindo.agitrainer.audio.TurnController
 import com.astongraphindo.agitrainer.data.LiveClient
 import com.astongraphindo.agitrainer.data.TokenStore
 import com.astongraphindo.agitrainer.data.TrainerApi
@@ -82,8 +83,21 @@ fun LiveVoiceScreen(
     val listState = rememberLazyListState()
 
     val live = remember { LiveClient() }
-    val recorder = remember { StreamingRecorder() }
     val player = remember { StreamingPlayer() }
+    // Automatic VAD is off server-side, so the app owns the turn boundary. The
+    // controller watches the mic level and sends turn_start / turn_end — see
+    // TurnController for why the server's own VAD cannot be used here.
+    val turnController = remember {
+        TurnController(
+            onSpeechStart = {
+                // Barge-in: the rep started talking, cut the CS audio immediately.
+                player.clear()
+                live.sendTurnStart()
+            },
+            onSpeechEnd = { live.sendTurnEnd() },
+        )
+    }
+    val recorder = remember { StreamingRecorder { rms -> turnController.onLevel(rms) } }
 
     var phase by remember { mutableStateOf(LivePhase.CONNECTING) }
     var sessionId by remember { mutableStateOf(0) }
@@ -351,6 +365,11 @@ fun LiveVoiceScreen(
                     recorder.stop()
                     player.stop()
                     scope.launch(Dispatchers.IO) {
+                        // Tutup giliran yang masih aktif supaya kalimat terakhir
+                        // ikut tertranskrip (server VAD-off: hanya turn_end yang
+                        // menutup giliran).
+                        runCatching { turnController.close() }
+                        kotlinx.coroutines.delay(600)
                         // Flush live transcript di server DULU sebelum finish/evaluate.
                         // Buffer transkrip hanya ditulis ke DB saat relay terima
                         // {"t":"stop"} atau socket ditutup — tanpa ini evaluate

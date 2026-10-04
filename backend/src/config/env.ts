@@ -47,8 +47,18 @@ const envSchema = z.object({
   LIVE_API_KEY: z.string().default(''),
   LIVE_MODEL: z.string().default('models/gemini-2.5-flash-native-audio-latest'),
   LIVE_VOICE: z.string().default('Puck'),
-  // Keep automatic VAD OFF by default: it truncates turns at mid-sentence pauses.
-  LIVE_DISABLE_AUTO_VAD: z.string().default('false'),
+  // Automatic VAD OFF by default: it truncates turns at mid-sentence pauses, so
+  // the Android client owns the turn boundary (audio/TurnController.kt).
+  LIVE_DISABLE_AUTO_VAD: z.string().default('true'),
+  // ── Automatic VAD tuning (only used when LIVE_DISABLE_AUTO_VAD=false) ──
+  // The Gemini default truncates a sales utterance at the first natural pause:
+  // measured, "…saya Adi dari Orimax, boleh bicara dengan bagian pengadaan IT?"
+  // was transcribed as "…Orimas, Bu" (7 fragments, keyword hilang) and the CS
+  // answered the wrong half. Verified with scripts/sweep_vad.py and sweep_pause.py.
+  LIVE_VAD_SILENCE_MS: z.coerce.number().int().positive().default(800),
+  LIVE_VAD_START_SENSITIVITY: z.string().default('START_SENSITIVITY_LOW'),
+  LIVE_VAD_END_SENSITIVITY: z.string().default('END_SENSITIVITY_LOW'),
+  LIVE_VAD_PREFIX_PADDING_MS: z.coerce.number().int().min(0).default(20),
   // Hard cap on one Live session, so a forgotten socket cannot burn quota.
   LIVE_MAX_SESSION_MS: z.coerce.number().int().positive().default(900_000),
 });
