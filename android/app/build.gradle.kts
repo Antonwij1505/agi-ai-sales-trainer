@@ -33,7 +33,7 @@ android {
             if (port.isEmpty()) "$scheme://$host/" else "$scheme://$host:$port/"
 
         val apiScheme = (project.findProperty("apiScheme") as String?) ?: "https"
-        val apiHost = (project.findProperty("apiHost") as String?) ?: "trainer.orimax.co.id"
+        val apiHost = (project.findProperty("apiHost") as String?) ?: "sirup-api.orimax.co.id"
         val apiPort = (project.findProperty("apiPort") as String?) ?: ""
 
         val authScheme = (project.findProperty("authScheme") as String?) ?: apiScheme
